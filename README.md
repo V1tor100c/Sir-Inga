@@ -1,3 +1,4 @@
+```mermaid
 flowchart TD
     A([Início]) --> B[Configurar hardware:<br/>encoder, célula de carga,<br/>motor, serial]
     B --> C[Calibrar:<br/>tara da célula de carga<br/>e relação pulsos/mm]
@@ -22,3 +23,4 @@ flowchart TD
     style K fill:#F44336,color:#fff
     style J fill:#FF9800,color:#fff
     style F fill:#2196F3,color:#fff
+```
