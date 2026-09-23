@@ -1,0 +1,13 @@
+feat: (Feature) Quando você adiciona uma nova funcionalidade ao projeto.
+
+fix: (Bug fix) Quando você corrige um erro ou comportamento inesperado.
+
+docs: (Documentation) Alterações que afetam apenas a documentação (arquivos Markdown, comentários, etc).
+
+refactor: (Refatoração) Mudança no código que não corrige um bug nem adiciona uma funcionalidade, mas melhora a estrutura interna.
+
+style: Alterações de formatação, como remoção de espaços em branco, ponto e vírgula faltando (não afeta a lógica).
+
+test: Adição ou correção de testes automatizados.
+
+chore: Tarefas de manutenção rotineira, como atualização de dependências ou configurações de build.
