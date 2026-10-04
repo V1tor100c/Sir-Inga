@@ -1,19 +1,30 @@
-#include <Arduino.h>
+#include "config.h"
+#include "botao.h"
+
+Botao botao1(Config::PIN_BOTAO_1, Config::MODO_BOTOES, Config::NIVEL_PRESSIONADO, Config::DEBOUNCE_MS);
+Botao botao2(Config::PIN_BOTAO_2, Config::MODO_BOTOES, Config::NIVEL_PRESSIONADO, Config::DEBOUNCE_MS);
 
 enum class Estado {
   Inicio,
   Configuracao,
+  Invalido,
   Execucao,
   Falha,
+  Obstrucao,
   Concluido
 };
 
 struct Eventos {
-  bool inicializacaoConcluida = false;
   bool configuracaoConfirmada = false;
   bool execucaoConcluida = false;
   bool falhaDetectada = false;
   bool falhaReconhecida = false;
+  bool obstrucaoDetectada = false;
+  bool obstrucaoResolvida = false;
+  bool concluido = false;
+
+  bool botao1Pressionado = false;
+  bool botao2Pressionado = false;
 };
 
 namespace {
@@ -26,12 +37,14 @@ const char* nomeDoEstado(Estado estado) {
     case Estado::Configuracao: return "Configuracao";
     case Estado::Execucao:     return "Execucao";
     case Estado::Falha:        return "Falha";
+    case Estado::Obstrucao:    return "Obstrucao";
     case Estado::Concluido:    return "Concluido";
   }
   return "Estado desconhecido";
 }
 
 void mudarEstado(Estado novoEstado) {
+
   if (novoEstado == estadoAtual) {
     return;
   }
@@ -39,13 +52,17 @@ void mudarEstado(Estado novoEstado) {
   estadoAtual = novoEstado;
   Serial.print("Estado: ");
   Serial.println(nomeDoEstado(estadoAtual));
+
 }
 
 Eventos lerEventos() {
   Eventos eventos;
 
-  // TODO: preencher com os botoes, sensores e criterios definidos pela equipe.
-  // Por enquanto, nenhum evento externo e gerado.
+  eventos.botao1Pressionado =
+    botao1.atualizar() == EventoBotao::Pressionado;
+
+  eventos.botao2Pressionado =
+    botao2.atualizar() == EventoBotao::Pressionado;
 
   return eventos;
 }
@@ -60,7 +77,8 @@ void atualizarMaquinaDeEstados(const Eventos& eventos) {
   switch (estadoAtual) {
     case Estado::Inicio:
       // Inicializacao concluida: apresentar a etapa de configuracao.
-      if (eventos.inicializacaoConcluida){
+
+      if (eventos.botao2Pressionado){
         mudarEstado(Estado::Configuracao);
       }
       break;
@@ -96,6 +114,9 @@ void setup() {
   Serial.begin(115200);
   Serial.print("Estado: ");
   Serial.println(nomeDoEstado(estadoAtual));
+
+  botao1.iniciar();
+  botao2.iniciar();
 }
 
 void loop() {
