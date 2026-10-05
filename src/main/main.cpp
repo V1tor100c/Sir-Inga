@@ -25,7 +25,11 @@ struct Eventos {
 
   bool botao1Pressionado = false;
   bool botao2Pressionado = false;
+
+  bool vazaoConfirmada = false;
 };
+
+float vazaoSetada = 0;
 
 namespace {
 
@@ -67,6 +71,25 @@ Eventos lerEventos() {
   return eventos;
 }
 
+float atualizarConfiguracaoVazao(){
+  uint8_t digitosVazao[4] = {0, 0, 0, 0};
+
+  for(int i = 0; i < 4; i++){
+    Eventos eventos;
+    while(eventos.botao2Pressionado == false){
+      eventos = lerEventos();
+      if(eventos.botao1Pressionado && !eventos.botao2Pressionado){
+        digitosVazao[i] = (digitosVazao[i] + 1) % 10;
+        // atualizar tela display
+      }
+    }
+  }
+  return  digitosVazao[0] * 100 
+        + digitosVazao[1] * 10 
+        + digitosVazao[2] * 1 
+        + digitosVazao[3] * 0.1;
+}
+
 void atualizarMaquinaDeEstados(const Eventos& eventos) {
   // Uma falha tem prioridade sobre a transicao normal durante a operacao.
   if ((estadoAtual == Estado::Configuracao || estadoAtual == Estado::Execucao) && eventos.falhaDetectada) {
@@ -77,15 +100,30 @@ void atualizarMaquinaDeEstados(const Eventos& eventos) {
   switch (estadoAtual) {
     case Estado::Inicio:
       // Inicializacao concluida: apresentar a etapa de configuracao.
-
-      if (eventos.botao2Pressionado){
+      // Tela logo
+      if (eventos.botao2Pressionado == true) {
         mudarEstado(Estado::Configuracao);
       }
       break;
 
     case Estado::Configuracao:
-      if (eventos.configuracaoConfirmada) {
-        mudarEstado(Estado::Execucao);
+      vazaoSetada = 0; 
+
+      vazaoSetada = atualizarConfiguracaoVazao();
+
+      while(true){
+        // Tela de confimação da configuracao
+        if (eventos.botao1Pressionado == true && vazaoSetada > Config::limiteInferiorVazao && vazaoSetada < Config::limiteSuperiorVazao){ 
+          mudarEstado(Estado::Execucao);
+          break;
+        }
+        else if(eventos.botao1Pressionado == true){
+          mudarEstado(Estado::Invalido);
+          break;
+        }
+        else if(eventos.botao2Pressionado == true){
+          break;
+        }
       }
       break;
 
