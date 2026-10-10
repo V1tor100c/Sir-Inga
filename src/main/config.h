@@ -10,6 +10,6 @@ namespace Config {
   constexpr uint8_t NIVEL_PRESSIONADO = LOW;
   constexpr uint32_t DEBOUNCE_MS = 30;
 
-  constexpr uint8_t limiteInferiorVazao = 2.5;
+  constexpr uint8_t limiteInferiorVazao = 2.5f;
   constexpr uint8_t limiteSuperiorVazao = 750;
 }

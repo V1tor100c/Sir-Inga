@@ -90,6 +90,21 @@ float atualizarConfiguracaoVazao(){
         + digitosVazao[3] * 0.1;
 }
 
+uint8_t atualizarConfiguracaoTempo(){
+  uint8_t digitosTempo = 0;
+  
+    Eventos eventos;
+    while(eventos.botao2Pressionado == false){
+      eventos = lerEventos();
+      if(eventos.botao1Pressionado && !eventos.botao2Pressionado){
+        digitosTempo = (digitosTempo + 1) % 61;
+        // atualizar tela display
+      }
+    
+  }
+  return  digitosTempo;
+}
+
 void atualizarMaquinaDeEstados(const Eventos& eventos) {
   // Uma falha tem prioridade sobre a transicao normal durante a operacao.
   if ((estadoAtual == Estado::Configuracao || estadoAtual == Estado::Execucao) && eventos.falhaDetectada) {
@@ -112,7 +127,7 @@ void atualizarMaquinaDeEstados(const Eventos& eventos) {
       vazaoSetada = atualizarConfiguracaoVazao();
 
       while(true){
-        // Tela de confimação da configuracao
+        // Tela de confimação da configuracao vazao
         if (eventos.botao1Pressionado == true && vazaoSetada > Config::limiteInferiorVazao && vazaoSetada < Config::limiteSuperiorVazao){ 
           mudarEstado(Estado::Execucao);
           break;
@@ -121,6 +136,21 @@ void atualizarMaquinaDeEstados(const Eventos& eventos) {
           mudarEstado(Estado::Invalido);
           break;
         }
+        else if(eventos.botao2Pressionado == true){
+          break;
+        }
+      }
+
+      while(true){
+        // Tela de confimação da configuracao tempo
+        if (eventos.botao1Pressionado == true){ 
+          mudarEstado(Estado::Execucao);
+          break;
+        }
+        // else if(eventos.botao1Pressionado == true){
+        //   mudarEstado(Estado::Invalido);
+        //   break;
+        // }
         else if(eventos.botao2Pressionado == true){
           break;
         }
