@@ -21,7 +21,6 @@ class Botao {
 
   void iniciar();
 
-  // Chamar frequentemente no loop(). Nao usa delay().
   EventoBotao atualizar(uint32_t agoraMs = millis());
 
  private:

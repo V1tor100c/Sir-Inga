@@ -10,6 +10,10 @@ namespace Config {
   constexpr uint8_t NIVEL_PRESSIONADO = LOW;
   constexpr uint32_t DEBOUNCE_MS = 30;
 
+  constexpr int8_t PIN_TELA_CS = 5;
+  constexpr int8_t PIN_TELA_DC = 27;
+  constexpr int8_t PIN_TELA_RST = 26;
+
   constexpr float limiteInferiorVazao = 2.5f;
   constexpr float limiteSuperiorVazao = 750.0f;
 }

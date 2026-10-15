@@ -1,8 +1,17 @@
 #include "config.h"
 #include "botao.h"
+#include "tela.h"
 
 Botao botao1(Config::PIN_BOTAO_1, Config::MODO_BOTOES, Config::NIVEL_PRESSIONADO, Config::DEBOUNCE_MS);
 Botao botao2(Config::PIN_BOTAO_2, Config::MODO_BOTOES, Config::NIVEL_PRESSIONADO, Config::DEBOUNCE_MS);
+
+Adafruit_ILI9341 display(
+  Config::PIN_TELA_CS,
+  Config::PIN_TELA_DC,
+  Config::PIN_TELA_RST
+);
+
+Tela tela(display);
 
 enum class Estado {
   Inicio,
@@ -30,6 +39,7 @@ struct Eventos {
 };
 
 float vazaoSetada = 0;
+uint8_t tempoSetado = 0;
 
 namespace {
 
@@ -80,7 +90,7 @@ float atualizarConfiguracaoVazao(){
       eventos = lerEventos();
       if(eventos.botao1Pressionado && !eventos.botao2Pressionado){
         digitosVazao[i] = (digitosVazao[i] + 1) % 10;
-        // atualizar tela display
+        tela.mostrarConfiguracaoVazao(digitosVazao, i);
       }
     }
   }
@@ -98,7 +108,7 @@ uint8_t atualizarConfiguracaoTempo(){
       eventos = lerEventos();
       if(eventos.botao1Pressionado && !eventos.botao2Pressionado){
         digitosTempo = (digitosTempo + 1) % 61;
-        // atualizar tela display
+        tela.mostrarConfiguracaoTempo(digitosTempo);
       }
     
   }
@@ -115,7 +125,7 @@ void atualizarMaquinaDeEstados(const Eventos& eventos) {
   switch (estadoAtual) {
     case Estado::Inicio:
       // Inicializacao concluida: apresentar a etapa de configuracao.
-      // Tela logo
+      tela.mostrarInicio();
       if (eventos.botao2Pressionado == true) {
         mudarEstado(Estado::Configuracao);
       }
@@ -123,8 +133,10 @@ void atualizarMaquinaDeEstados(const Eventos& eventos) {
 
     case Estado::Configuracao:
       vazaoSetada = 0; 
-
       vazaoSetada = atualizarConfiguracaoVazao();
+
+      tempoSetado = 0;
+      tempoSetado = atualizarConfiguracaoTempo();
 
       while(true){
         // Tela de confimação da configuracao vazao
@@ -185,6 +197,8 @@ void setup() {
 
   botao1.iniciar();
   botao2.iniciar();
+
+  tela.iniciar();
 }
 
 void loop() {
