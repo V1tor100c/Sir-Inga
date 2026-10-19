@@ -1,10 +1,14 @@
 #include "botao.h"
 
 Botao::Botao(uint8_t pino,
+             uint8_t pino_encoderA,
+             uint8_t pino_encoderB,
              uint8_t modoPino,
              uint8_t nivelPressionado,
              uint32_t debounceMs)
     : pino_(pino),
+      pino_encoderA_(pino_encoderA),
+      pino_encoderB_(pino_encoderB),
       modoPino_(modoPino),
       nivelPressionado_(nivelPressionado),
       debounceMs_(debounceMs) {}
@@ -13,10 +17,12 @@ void Botao::iniciar() {
   pinMode(pino_, modoPino_);
 
   // Assume o nivel atual como inicial; nao gera clique falso ao ligar.
-  leituraAnterior_ = digitalRead(pino_);
-  estadoEstavel_ = leituraAnterior_;
+  leituraAnterior_Botao = digitalRead(pino_);
+  estadoEstavel_ = leituraAnterior_Botao;
   instanteUltimaMudanca_ = millis();
   iniciado_ = true;
+
+  estadoAnterior_Encoder = lerEncoder();
 }
 
 EventoBotao Botao::atualizar(uint32_t agoraMs) {
@@ -25,8 +31,8 @@ EventoBotao Botao::atualizar(uint32_t agoraMs) {
   }
 
   const uint8_t leituraAtual = digitalRead(pino_);
-  if (leituraAtual != leituraAnterior_) {
-    leituraAnterior_ = leituraAtual;
+  if (leituraAtual != leituraAnterior_Botao) {
+    leituraAnterior_Botao = leituraAtual;
     instanteUltimaMudanca_ = agoraMs;
   }
 
@@ -40,4 +46,23 @@ EventoBotao Botao::atualizar(uint32_t agoraMs) {
   return estadoEstavel_ == nivelPressionado_
              ? EventoBotao::Pressionado
              : EventoBotao::Solto;
+}
+
+int Botao::lerEncoder(){
+  int A = digitalRead(pino_encoderA_);
+  int B = digitalRead(pino_encoderB_);
+  return (A << 1) | B;
+}
+
+EventoBotao Botao::lerRotacao(){
+  estadoAtual_Encoder = lerEncoder();
+
+  if(estadoAnterior_Encoder > estadoAtual_Encoder){
+    return EventoBotao::Horario;
+  }
+  else if(estadoAnterior_Encoder < estadoAtual_Encoder){
+    return EventoBotao::AntiHorario;
+  }
+  else
+    return EventoBotao::SemGirar;
 }

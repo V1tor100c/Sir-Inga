@@ -11,15 +11,17 @@ class Tela {
 
   void iniciar();
 
-  void mostrarInicio();
-  void mostrarConfiguracaoVazao(const uint8_t digitos[4], uint8_t digitoSelecionado);
-  void mostrarConfiguracaoTempo(uint8_t tempoMinutos);
-  void mostrarConfirmacao(float vazaoMlPorHora, uint8_t tempoMinutos);
-  void mostrarExecucao(float vazaoMlPorHora, uint8_t tempoRestanteMinutos);
-  void mostrarInvalido(const char* mensagem);
-  void mostrarFalha(const char* mensagem);
-  void mostrarObstrucao();
-  void mostrarConcluido();
+  void Inicio();
+  void ConfiguracaoVazao(const uint8_t digitos, uint8_t digitoSelecionado);
+  void ConfiguracaoTempo(uint8_t tempoMinutos);
+  void Confirmacao(float vazaoMlPorHora, uint8_t tempoMinutos);
+  void ConfiguracaoValida(float vazaoMlPorHora, uint8_t tempoMinutos);
+  void ConfiguracaoInvalida(const char* mensagem);
+  void Execucao(float vazaoMlPorHora, uint8_t tempoRestanteMinutos);
+  // void Invalido(const char* mensagem);
+  void Falha(const char* mensagem);
+  void Obstrucao();
+  void Concluido();
 
  private:
   Adafruit_ILI9341& display_;

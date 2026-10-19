@@ -27,31 +27,31 @@ void mostrarPagina(uint8_t pagina) {
 
   switch (pagina) {
     case 0:
-      tela.mostrarInicio();
+      tela.Inicio();
       break;
     case 1:
-      tela.mostrarConfiguracaoVazao(kDigitosExemplo, 1);
+      tela.ConfiguracaoVazao(kDigitosExemplo, 1);
       break;
     case 2:
-      tela.mostrarConfiguracaoTempo(30);
+      tela.ConfiguracaoTempo(30);
       break;
     case 3:
-      tela.mostrarConfirmacao(123.4f, 30);
+      tela.Confirmacao(123.4f, 30);
       break;
     case 4:
-      tela.mostrarExecucao(123.4f, 24);
+      tela.Execucao(123.4f, 24);
       break;
     case 5:
-      tela.mostrarInvalido("Valor de exemplo invalido");
+      tela.Invalido("Valor de exemplo invalido");
       break;
     case 6:
-      tela.mostrarFalha("Falha de exemplo");
+      tela.Falha("Falha de exemplo");
       break;
     case 7:
-      tela.mostrarObstrucao();
+      tela.Obstrucao();
       break;
     case 8:
-      tela.mostrarConcluido();
+      tela.Concluido();
       break;
   }
 }

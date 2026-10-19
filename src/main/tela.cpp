@@ -46,7 +46,7 @@ void Tela::desenharVazao(float vazaoMlPorHora, int16_t y) {
   display_.print(" mL/h");
 }
 
-void Tela::mostrarInicio() {
+void Tela::Inicio() {
   desenharBase("SIR INGA", ILI9341_DARKCYAN);
   display_.setTextColor(kCorTexto);
   display_.setTextSize(2);
@@ -57,8 +57,8 @@ void Tela::mostrarInicio() {
   display_.println("Pressione B2 para configurar");
 }
 
-void Tela::mostrarConfiguracaoVazao(const uint8_t digitos[4],
-                                    uint8_t digitoSelecionado) {
+void Tela::ConfiguracaoVazao(const uint8_t digitos, uint8_t digitoSelecionado) {
+  
   desenharBase("CONFIGURAR VAZAO", ILI9341_BLUE);
   display_.setTextColor(kCorTexto);
   display_.setTextSize(2);
@@ -92,7 +92,7 @@ void Tela::mostrarConfiguracaoVazao(const uint8_t digitos[4],
   display_.println("B1: alterar   B2: confirmar digito");
 }
 
-void Tela::mostrarConfiguracaoTempo(uint8_t tempoMinutos) {
+void Tela::ConfiguracaoTempo(uint8_t tempoMinutos) {
   desenharBase("CONFIGURAR TEMPO", ILI9341_BLUE);
   display_.setTextColor(kCorTexto);
   display_.setTextSize(2);
@@ -110,7 +110,7 @@ void Tela::mostrarConfiguracaoTempo(uint8_t tempoMinutos) {
   display_.println("B1: alterar   B2: confirmar");
 }
 
-void Tela::mostrarConfirmacao(float vazaoMlPorHora, uint8_t tempoMinutos) {
+void Tela::Confirmacao(float vazaoMlPorHora, uint8_t tempoMinutos) {
   desenharBase("CONFIRMAR PARAMETROS", ILI9341_BLUE);
   desenharVazao(vazaoMlPorHora, 82);
   display_.setTextColor(kCorTexto);
@@ -124,7 +124,16 @@ void Tela::mostrarConfirmacao(float vazaoMlPorHora, uint8_t tempoMinutos) {
   display_.println("Confira os parametros antes de continuar");
 }
 
-void Tela::mostrarExecucao(float vazaoMlPorHora, uint8_t tempoRestanteMinutos) {
+void Tela::ConfiguracaoValida(float vazaoMLPorHora, uint8_t tempoMinutos){
+
+}
+
+void Tela::ConfiguracaoInvalida(const char* mensagem) {
+  desenharBase("CONFIGURACAO INVALIDA", ILI9341_MAROON);
+  desenharMensagem(mensagem != nullptr ? mensagem : "Verifique os valores", kCorAlerta);
+}
+
+void Tela::Execucao(float vazaoMlPorHora, uint8_t tempoRestanteMinutos) {
   desenharBase("INFUSAO EM ANDAMENTO", ILI9341_DARKGREEN);
   desenharVazao(vazaoMlPorHora, 82);
   display_.setTextColor(kCorTexto);
@@ -138,12 +147,8 @@ void Tela::mostrarExecucao(float vazaoMlPorHora, uint8_t tempoRestanteMinutos) {
   display_.println("Somente demonstracao de bancada");
 }
 
-void Tela::mostrarInvalido(const char* mensagem) {
-  desenharBase("CONFIGURACAO INVALIDA", ILI9341_MAROON);
-  desenharMensagem(mensagem != nullptr ? mensagem : "Verifique os valores", kCorAlerta);
-}
 
-void Tela::mostrarFalha(const char* mensagem) {
+void Tela::Falha(const char* mensagem) {
   desenharBase("FALHA", ILI9341_MAROON);
   desenharMensagem(mensagem != nullptr ? mensagem : "Verifique o sistema", kCorErro);
   display_.setTextColor(kCorTexto);
@@ -152,7 +157,7 @@ void Tela::mostrarFalha(const char* mensagem) {
   display_.println("Motor deve permanecer parado neste estado");
 }
 
-void Tela::mostrarObstrucao() {
+void Tela::Obstrucao() {
   desenharBase("OBSTRUCAO", ILI9341_MAROON);
   desenharMensagem("Verifique o caminho do fluido", kCorErro);
   display_.setTextColor(kCorTexto);
@@ -161,7 +166,7 @@ void Tela::mostrarObstrucao() {
   display_.println("Alarme e parada sao tratados pela aplicacao");
 }
 
-void Tela::mostrarConcluido() {
+void Tela::Concluido() {
   desenharBase("CONCLUIDO", ILI9341_DARKGREEN);
   desenharMensagem("Operacao finalizada", kCorSucesso);
 }

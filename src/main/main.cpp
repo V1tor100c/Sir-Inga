@@ -2,13 +2,17 @@
 #include "botao.h"
 #include "tela.h"
 
-Botao botao1(Config::PIN_BOTAO_1, Config::MODO_BOTOES, Config::NIVEL_PRESSIONADO, Config::DEBOUNCE_MS);
-Botao botao2(Config::PIN_BOTAO_2, Config::MODO_BOTOES, Config::NIVEL_PRESSIONADO, Config::DEBOUNCE_MS);
+Botao botao(Config::PIN_BOTAO, 
+            Config::PIN_ENCODER_A, 
+            Config::PIN_ENCODER_B, 
+            Config::MODO_BOTOES, 
+            Config::NIVEL_PRESSIONADO, 
+            Config::DEBOUNCE_MS);
 
 Adafruit_ILI9341 display(
-    Config::PIN_TELA_CS,
-    Config::PIN_TELA_DC,
-    Config::PIN_TELA_RST);
+                        Config::PIN_TELA_CS,
+                        Config::PIN_TELA_DC,
+                        Config::PIN_TELA_RST);
 
 Tela tela(display);
 
@@ -34,8 +38,9 @@ struct Eventos
   bool obstrucaoResolvida = false;
   bool concluido = false;
 
-  bool botao1Pressionado = false;
-  bool botao2Pressionado = false;
+  bool botaoPressionado = false;
+  bool botaoHorario = false;
+  bool botaoAntiHorario = false;
 
   bool vazaoConfirmada = false;
 };
@@ -89,39 +94,66 @@ namespace
   {
     Eventos eventos;
 
-    eventos.botao1Pressionado =
-        botao1.atualizar() == EventoBotao::Pressionado;
+    eventos.botaoPressionado =
+      botao.atualizar() == EventoBotao::Pressionado;
 
-    eventos.botao2Pressionado =
-        botao2.atualizar() == EventoBotao::Pressionado;
+      eventos.botaoHorario = botao.atualizar() == EventoBotao::Horario;
+      eventos.botaoAntiHorario = botao.atualizar() == EventoBotao::AntiHorario;
 
     return eventos;
   }
 
-  float atualizarConfiguracaoVazao()
+  // float atualizarConfiguracaoVazao()
+  // {
+  //   uint8_t digitosVazao[4] = {0, 0, 0, 0};
+  //   tela.ConfiguracaoVazao(digitosVazao, 0);
+  //   for (int i = 0; i < 4; i++)
+  //   {
+  //     Eventos eventos;
+  //     while (eventos.botaoPressionado == false)
+  //     {
+  //       eventos = lerEventos();
+  //       if (eventos.botao1Pressionado && !eventos.botao2Pressionado)
+  //       {
+  //         digitosVazao[i] = (digitosVazao[i] + 1) % 10;
+  //         tela.ConfiguracaoVazao(digitosVazao, i);
+  //       }
+  //     }
+  //   }
+  //   return digitosVazao[0] * 100 + digitosVazao[1] * 10 + digitosVazao[2] * 1 + digitosVazao[3] * 0.1;
+  }
+
+ int atualizarConfiguracaoVazao()
   {
-    uint8_t digitosVazao[4] = {0, 0, 0, 0};
-    tela.mostrarConfiguracaoVazao(digitosVazao, 0);
-    for (int i = 0; i < 4; i++)
-    {
-      Eventos eventos;
-      while (eventos.botao2Pressionado == false)
+    int valorVazao = Config::limiteInferiorVazao;
+    tela.ConfiguracaoVazao(valorVazao);
+    Eventos eventos;
+      while (eventos.botaoPressionado == false)
       {
         eventos = lerEventos();
-        if (eventos.botao1Pressionado && !eventos.botao2Pressionado)
-        {
-          digitosVazao[i] = (digitosVazao[i] + 1) % 10;
-          tela.mostrarConfiguracaoVazao(digitosVazao, i);
+        if (valorVazao >= Config::limiteInferiorVazao && valorVazao <= Config::limiteSuperiorVazao){
+          if (eventos.botaoHorario)
+          {
+            valorVazao = valorVazao + 1;
+          }
+          else if(eventos.botaoAntiHorario)
+          {
+            valorVazao = valorVazao - 1;
+          }
+          tela.ConfiguracaoVazao(valorVazao);
+        }
+        if (eventos.botaoPressionado){
+          break;
         }
       }
+    return valorVazao;
     }
-    return digitosVazao[0] * 100 + digitosVazao[1] * 10 + digitosVazao[2] * 1 + digitosVazao[3] * 0.1;
-  }
+  
 
   uint8_t atualizarConfiguracaoTempo()
   {
     uint8_t digitosTempo = 0;
-    tela.mostrarConfiguracaoTempo(digitosTempo);
+    tela.ConfiguracaoTempo(digitosTempo);
     Eventos eventos;
     while (eventos.botao2Pressionado == false)
     {
@@ -129,7 +161,7 @@ namespace
       if (eventos.botao1Pressionado && !eventos.botao2Pressionado)
       {
         digitosTempo = (digitosTempo + 1) % 61;
-        tela.mostrarConfiguracaoTempo(digitosTempo);
+        tela.ConfiguracaoTempo(digitosTempo);
       }
     }
     return digitosTempo;
@@ -137,7 +169,6 @@ namespace
 
   void atualizarMaquinaDeEstados(const Eventos &eventos)
   {
-    // Uma falha tem prioridade sobre a transicao normal durante a operacao.
     if ((estadoAtual == Estado::Configuracao || estadoAtual == Estado::Execucao) && eventos.falhaDetectada)
     {
       mudarEstado(Estado::Falha);
@@ -147,8 +178,7 @@ namespace
     switch (estadoAtual)
     {
     case Estado::Inicio:
-      // Inicializacao concluida: apresentar a etapa de configuracao.
-      tela.mostrarInicio();
+      tela.Inicio();
       if (eventos.botao2Pressionado == true)
       {
         mudarEstado(Estado::Configuracao);
@@ -192,8 +222,10 @@ namespace
     case Estado::Validacao:
       if ((vazaoSetada * tempoSetado) < Config::volumeSeginga)
       {
-        // tela de configuração valida
-        mudarEstado(Estado::Execucao);
+        tela.ConfiguracaoValida(vazaoSetada, tempoSetado);
+        if(eventos.botao2Pressionado == true){
+          mudarEstado(Estado::Execucao);
+        }
       }
       else
       {
@@ -202,8 +234,10 @@ namespace
       break;
 
     case Estado::Invalido:
-      // tela de configuração invalida, volume que sera injetado maior q a seringa
-      mudarEstado(Estado::Configuracao);
+      tela.ConfiguracaoInvalida("Volume de medicamento maior q o volume da seringa");
+      if (eventos.botao2Pressionado == true){
+        mudarEstado(Estado::Configuracao);
+      }
       break;
 
     case Estado::Execucao:
@@ -235,8 +269,7 @@ void setup()
   Serial.print("Estado: ");
   Serial.println(nomeDoEstado(estadoAtual));
 
-  botao1.iniciar();
-  botao2.iniciar();
+  botao.iniciar();
 
   tela.iniciar();
 }

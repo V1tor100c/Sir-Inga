@@ -1,41 +1,83 @@
 #include <Arduino.h>
 
-#include "../../main/botao.h"
+// Troque estes pinos pelos que vocês escolherem para a placa.
+constexpr uint8_t PIN_ENCODER_A  = 25;
+constexpr uint8_t PIN_ENCODER_B  = 26;
+constexpr uint8_t PIN_ENCODER_SW = 27;
 
-namespace {
+uint8_t estadoAnteriorEncoder;
+int transicoes = 0;
 
-Botao botao1(Config::PIN_BOTAO_1,
-             Config::MODO_BOTOES,
-             Config::NIVEL_PRESSIONADO,
-             Config::DEBOUNCE_MS);
-Botao botao2(Config::PIN_BOTAO_2,
-             Config::MODO_BOTOES,
-             Config::NIVEL_PRESSIONADO,
-             Config::DEBOUNCE_MS);
+// Tabela para interpretar as mudanças nos sinais A e B.
+const int8_t tabelaEncoder[16] = {
+   0, -1,  1,  0,
+   1,  0,  0, -1,
+  -1,  0,  0,  1,
+   0,  1, -1,  0
+};
 
-void imprimirEvento(const char* nome, EventoBotao evento) {
-  if (evento == EventoBotao::Pressionado) {
-    Serial.print(nome);
-    Serial.println(" pressionado");
-  } else if (evento == EventoBotao::Solto) {
-    Serial.print(nome);
-    Serial.println(" solto");
-  }
+// O operador << 1 desloca o valor de A uma posição para a esquerda. 
+// O operador | combina esse resultado com B. 
+// Assim, as duas leituras viram um número de 0 a 3:
+int lerEstadoEncoder() {
+  return (digitalRead(PIN_ENCODER_A) << 1) | digitalRead(PIN_ENCODER_B);
 }
-
-}  // namespace
 
 void setup() {
   Serial.begin(115200);
-  botao1.iniciar();
-  botao2.iniciar();
 
-  Serial.println("Teste dos botoes iniciado");
-  Serial.println("Aperte e solte cada botao; cada evento deve aparecer uma vez.");
+  pinMode(PIN_ENCODER_A, INPUT_PULLUP);
+  pinMode(PIN_ENCODER_B, INPUT_PULLUP);
+  pinMode(PIN_ENCODER_SW, INPUT_PULLUP);
+
+  estadoAnteriorEncoder = lerEstadoEncoder();
 }
 
 void loop() {
-  imprimirEvento("Botao 1", botao1.atualizar());
-  imprimirEvento("Botao 2", botao2.atualizar());
-  delay(2);
+  lerRotacao();
+  lerBotao();
+
+  // Deixe loop rodar frequentemente para perceber as mudanças do encoder.
+}
+
+void lerRotacao() {
+  const uint8_t estadoAtualEncoder = lerEstadoEncoder();
+  const uint8_t indice = (estadoAnteriorEncoder << 2) | estadoAtualEncoder;
+
+  transicoes += tabelaEncoder[indice];
+  estadoAnteriorEncoder = estadoAtualEncoder;
+
+  // Muitos encoders produzem quatro mudanças elétricas por clique.
+  // O número pode variar conforme o modelo.
+  if (transicoes >= 4) {
+    Serial.println("Giro horario");
+    transicoes = 0;
+  } else if (transicoes <= -4) {
+    Serial.println("Giro anti-horario");
+    transicoes = 0;
+  }
+}
+
+void lerBotao() {
+  static bool botaoEstavaPressionado = false;
+  static bool leituraAnterior = HIGH;
+  static unsigned long ultimaMudanca = 0;
+
+  const bool leitura = digitalRead(PIN_ENCODER_SW);
+
+  if (leitura != leituraAnterior) {
+    ultimaMudanca = millis();
+    leituraAnterior = leitura;
+  }
+
+  // Só aceita a mudança depois de estável por 30 ms (debounce).
+  if (millis() - ultimaMudanca >= 30) {
+    const bool botaoPressionado = (leitura == LOW);
+
+    if (botaoPressionado && !botaoEstavaPressionado) {
+      Serial.println("Botao pressionado");
+    }
+
+    botaoEstavaPressionado = botaoPressionado;
+  }
 }
