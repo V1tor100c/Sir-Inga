@@ -33,6 +33,9 @@ void setup() {
   estadoAnteriorEncoder = lerEstadoEncoder();
 }
 
+void lerRotacao();
+void lerBotao();
+
 void loop() {
   lerRotacao();
   lerBotao();

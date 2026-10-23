@@ -12,7 +12,8 @@ class Tela {
   void iniciar();
 
   void Inicio();
-  void ConfiguracaoVazao(const uint8_t digitos, uint8_t digitoSelecionado);
+  void ConfiguracaoVazao(float vazaoMlPorHora);
+  void ConfirmacaoVazao(float vazaoMlPorHora, bool confirmarSelecionado);
   void ConfiguracaoTempo(uint8_t tempoMinutos);
   void Confirmacao(float vazaoMlPorHora, uint8_t tempoMinutos);
   void ConfiguracaoValida(float vazaoMlPorHora, uint8_t tempoMinutos);

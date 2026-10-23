@@ -16,6 +16,8 @@ namespace Config {
   constexpr int8_t PIN_TELA_RST = 26;
 
   constexpr int volumeSeginga = 5;
-  constexpr float limiteInferiorVazao = 2.5f;
+  constexpr float limiteInferiorVazao = 2.0f;
   constexpr float limiteSuperiorVazao = 750.0f;
+  constexpr uint8_t limiteInferiorTempo = 0;
+  constexpr uint8_t limiteSuperiorTempo = 61;
 }

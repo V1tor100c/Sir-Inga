@@ -42,6 +42,7 @@ class Botao {
 
   int estadoAnterior_Encoder = 0;
   int estadoAtual_Encoder = 0;
+  int transicoesEncoder_ = 0;
 
   int lerEncoder();
   EventoBotao lerRotacao();

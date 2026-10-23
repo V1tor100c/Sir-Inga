@@ -15,6 +15,8 @@ Botao::Botao(uint8_t pino,
 
 void Botao::iniciar() {
   pinMode(pino_, modoPino_);
+  pinMode(pino_encoderA_, INPUT_PULLUP);
+  pinMode(pino_encoderB_, INPUT_PULLUP);
 
   // Assume o nivel atual como inicial; nao gera clique falso ao ligar.
   leituraAnterior_Botao = digitalRead(pino_);
@@ -28,6 +30,11 @@ void Botao::iniciar() {
 EventoBotao Botao::atualizar(uint32_t agoraMs) {
   if (!iniciado_) {
     return EventoBotao::Nenhum;
+  }
+
+  const EventoBotao eventoRotacao = lerRotacao();
+  if (eventoRotacao != EventoBotao::SemGirar) {
+    return eventoRotacao;
   }
 
   const uint8_t leituraAtual = digitalRead(pino_);
@@ -55,14 +62,26 @@ int Botao::lerEncoder(){
 }
 
 EventoBotao Botao::lerRotacao(){
-  estadoAtual_Encoder = lerEncoder();
+  static const int8_t tabelaTransicoes[16] = {
+     0, -1,  1,  0,
+     1,  0,  0, -1,
+    -1,  0,  0,  1,
+     0,  1, -1,  0
+  };
 
-  if(estadoAnterior_Encoder > estadoAtual_Encoder){
+  estadoAtual_Encoder = lerEncoder();
+  const uint8_t indice = (estadoAnterior_Encoder << 2) | estadoAtual_Encoder;
+  transicoesEncoder_ += tabelaTransicoes[indice];
+  estadoAnterior_Encoder = estadoAtual_Encoder;
+
+  if (transicoesEncoder_ >= 4) {
+    transicoesEncoder_ = 0;
     return EventoBotao::Horario;
   }
-  else if(estadoAnterior_Encoder < estadoAtual_Encoder){
+  if (transicoesEncoder_ <= -4) {
+    transicoesEncoder_ = 0;
     return EventoBotao::AntiHorario;
   }
-  else
-    return EventoBotao::SemGirar;
+
+  return EventoBotao::SemGirar;
 }

@@ -54,42 +54,36 @@ void Tela::Inicio() {
   display_.println("Bomba de seringa");
   display_.setTextColor(kCorRealce);
   display_.setCursor(24, 142);
-  display_.println("Pressione B2 para configurar");
+  display_.println("Pressione o encoder para iniciar");
 }
 
-void Tela::ConfiguracaoVazao(const uint8_t digitos, uint8_t digitoSelecionado) {
-  
+void Tela::ConfiguracaoVazao(float vazaoMlPorHora) {
   desenharBase("CONFIGURAR VAZAO", ILI9341_BLUE);
   display_.setTextColor(kCorTexto);
   display_.setTextSize(2);
   display_.setCursor(18, 58);
   display_.println("Vazao (mL/h)");
-
-  if (digitos == nullptr) {
-    desenharMensagem("Digitos indisponiveis", kCorAlerta);
-    return;
-  }
-
-  const int16_t x[4] = {66, 105, 144, 205};
-  const int16_t y = 105;
-  for (uint8_t i = 0; i < 4; ++i) {
-    if (i == digitoSelecionado) {
-      display_.drawRoundRect(x[i] - 7, y - 8, 35, 48, 5, kCorRealce);
-    }
-    display_.setTextColor(kCorTexto);
-    display_.setTextSize(3);
-    display_.setCursor(x[i], y);
-    display_.print(digitos[i] % 10);
-  }
-
+  display_.setTextColor(kCorRealce);
+  display_.setTextSize(4);
+  display_.setCursor(40, 110);
+  display_.print(vazaoMlPorHora, 0);
+  display_.setTextSize(2);
   display_.setTextColor(kCorTexto);
-  display_.setTextSize(3);
-  display_.setCursor(181, y);
-  display_.print('.');
+  display_.setCursor(18, 184);
+  display_.println("Gire: ajustar  Pressione: seguir");
+}
 
-  display_.setTextSize(1);
-  display_.setCursor(18, 174);
-  display_.println("B1: alterar   B2: confirmar digito");
+void Tela::ConfirmacaoVazao(float vazaoMlPorHora, bool confirmarSelecionado) {
+  desenharBase("CONFIRMAR VAZAO", ILI9341_BLUE);
+  desenharVazao(vazaoMlPorHora, 72);
+
+  display_.setTextSize(2);
+  display_.setTextColor(confirmarSelecionado ? kCorRealce : kCorTexto);
+  display_.setCursor(28, 132);
+  display_.print(confirmarSelecionado ? "> Confirmar" : "  Confirmar");
+  display_.setTextColor(confirmarSelecionado ? kCorTexto : kCorRealce);
+  display_.setCursor(28, 164);
+  display_.print(confirmarSelecionado ? "  Retornar" : "> Retornar");
 }
 
 void Tela::ConfiguracaoTempo(uint8_t tempoMinutos) {
@@ -107,7 +101,7 @@ void Tela::ConfiguracaoTempo(uint8_t tempoMinutos) {
   display_.setTextSize(1);
   display_.setTextColor(kCorTexto);
   display_.setCursor(18, 184);
-  display_.println("B1: alterar   B2: confirmar");
+  display_.println("Gire: ajustar  Pressione: confirmar");
 }
 
 void Tela::Confirmacao(float vazaoMlPorHora, uint8_t tempoMinutos) {
