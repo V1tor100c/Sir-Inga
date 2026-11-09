@@ -180,13 +180,67 @@ namespace
       break;
 
     case Estado::Configuracao:
+
+      Eventos eventos;
       switch (EstadoConfiguracao)
       {
-        case EstadoConfiguracao::Vazao:
+        case Configuracao::Vazao:
 
+        vazaoSetada = atualizarConfiguracaoVazao();
+
+        Confirmacao confirmarVazao = Confirmacao::Confirmar;
+
+          if (eventos.botaoPressionado == false || confirmarVazao == Confirmacao::Retornar || confirmarVazao == Confirmacao::Invalido){
+            eventos = lerEventos();
+            if(eventos.botaoHorario || eventos.botaoAntiHorario){
+              if(confirmarVazao == Confirmacao::Confirmar){
+                confirmarVazao = Confirmacao::Retornar;
+              }
+              else{
+                confirmarVazao = Confirmacao::Confirmar;
+              }
+            }
+          }
+          
+          else{
+
+          Validacao validacaoVazao;
+          eventos = lerEventos();
+            if (eventos.botaoPressionado == true && vazaoSetada > Config::limiteInferiorVazao && vazaoSetada < Config::limiteSuperiorVazao && confirmarVazao == Confirmacao::Confirmar)
+            {
+              validacaoVazao = Confirmacao::Valido;
+              EstadoConfiguracao = Configuracao::Tempo;
+            }
+            else if (eventos.botaoPressionado == true && confirmarVazao == Confirmacao::Confirmar)
+            {
+              validacaoVazao = Confirmacao::Invalido;
+              // tela::ConfiguracaoInvalida("Valor da vazao invalido");
+              mudarEstado(Estado::Invalido);
+              
+            }
+          }
         break;
 
         case EstadoConfiguracao::Tempo:
+
+          tempoSetado = atualizarConfiguracaoTempo();
+
+          Confirmacao confirmarTempo = Confirmacao::Confirmar;
+
+          if (eventos.botaoPressionado == false || confirmarTempo == Confirmacao::Retornar || confirmarTempo == Confirmacao::Invalido){
+            eventos = lerEventos();
+            if(eventos.botaoHorario || eventos.botaoAntiHorario){
+              if(confirmarTempo == Confirmacao::Confirmar){
+                confirmarTempo = Confirmacao::Retornar;
+              }
+              else{
+                confirmarTempo = Confirmacao::Confirmar;
+              }
+            }
+          }
+        break;
+        }
+
 
         break;
       }
