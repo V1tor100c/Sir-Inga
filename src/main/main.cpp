@@ -28,19 +28,19 @@ enum class Estado
   Concluido
 };
 
-enum class Configuracao
+enum class EtapaConfiguracao
 {
   Vazao,
   Tempo
 };
 
-enum class Validacao
+enum class ResultadoValidacao
 {
   Valido,
   Invalido
 };
 
-enum class Confirmacao
+enum class OpcaoConfirmacao
 {
   Confirmar,
   Retornar
@@ -95,15 +95,15 @@ namespace
     return "Estado desconhecido";
   }
 
-  Configuracao EstadoConfiguracao = Configuracao::Vazao;
+  EtapaConfiguracao etapaConfiguracao = EtapaConfiguracao::Vazao;
 
-  const char *nomeDaConfiguracao(Configuracao configuracao)
+  const char *nomeDaEtapaConfiguracao(EtapaConfiguracao etapa)
   {
-    switch (configuracao)
+    switch (etapa)
     {
-    case Configuracao::Vazao:
+    case EtapaConfiguracao::Vazao:
       return "Vazao";
-    case Configuracao::Tempo:
+    case EtapaConfiguracao::Tempo:
       return "Tempo";
     }
     return "Configuracao desconhecida";
@@ -133,8 +133,6 @@ namespace
       eventos.botaoAntiHorario = botao.atualizar() == EventoBotao::AntiHorario;
 
     return eventos;
-  }
-
   }
 
   int atualizarConfiguracaoVazao(){
@@ -179,162 +177,63 @@ namespace
       }
       break;
 
-    case Estado::Configuracao:
+    case Estado::Configuracao: {
+      Eventos eventosConfiguracao;
 
-      Eventos eventos;
-      switch (EstadoConfiguracao)
-      {
-        case Configuracao::Vazao:
+      switch (etapaConfiguracao) {
+        case EtapaConfiguracao::Vazao: {
+          vazaoSetada = atualizarConfiguracaoVazao();
+          OpcaoConfirmacao opcaoVazao = OpcaoConfirmacao::Confirmar;
 
-        vazaoSetada = atualizarConfiguracaoVazao();
-
-        Confirmacao confirmarVazao = Confirmacao::Confirmar;
-
-          if (eventos.botaoPressionado == false || confirmarVazao == Confirmacao::Retornar || confirmarVazao == Confirmacao::Invalido){
-            eventos = lerEventos();
-            if(eventos.botaoHorario || eventos.botaoAntiHorario){
-              if(confirmarVazao == Confirmacao::Confirmar){
-                confirmarVazao = Confirmacao::Retornar;
-              }
-              else{
-                confirmarVazao = Confirmacao::Confirmar;
-              }
+          if (!eventosConfiguracao.botaoPressionado ||
+              opcaoVazao == OpcaoConfirmacao::Retornar) {
+            eventosConfiguracao = lerEventos();
+            if (eventosConfiguracao.botaoHorario ||
+                eventosConfiguracao.botaoAntiHorario) {
+              opcaoVazao = opcaoVazao == OpcaoConfirmacao::Confirmar
+                               ? OpcaoConfirmacao::Retornar
+                               : OpcaoConfirmacao::Confirmar;
             }
-          }
-          
-          else{
-
-          Validacao validacaoVazao;
-          eventos = lerEventos();
-            if (eventos.botaoPressionado == true && vazaoSetada > Config::limiteInferiorVazao && vazaoSetada < Config::limiteSuperiorVazao && confirmarVazao == Confirmacao::Confirmar)
-            {
-              validacaoVazao = Confirmacao::Valido;
-              EstadoConfiguracao = Configuracao::Tempo;
-            }
-            else if (eventos.botaoPressionado == true && confirmarVazao == Confirmacao::Confirmar)
-            {
-              validacaoVazao = Confirmacao::Invalido;
-              // tela::ConfiguracaoInvalida("Valor da vazao invalido");
+          } else {
+            eventosConfiguracao = lerEventos();
+            if (eventosConfiguracao.botaoPressionado &&
+                vazaoSetada > Config::limiteInferiorVazao &&
+                vazaoSetada < Config::limiteSuperiorVazao &&
+                opcaoVazao == OpcaoConfirmacao::Confirmar) {
+              etapaConfiguracao = EtapaConfiguracao::Tempo;
+            } else if (eventosConfiguracao.botaoPressionado &&
+                       opcaoVazao == OpcaoConfirmacao::Confirmar) {
               mudarEstado(Estado::Invalido);
-              
             }
           }
-        break;
-
-        case EstadoConfiguracao::Tempo:
-
-          tempoSetado = atualizarConfiguracaoTempo();
-
-          Confirmacao confirmarTempo = Confirmacao::Confirmar;
-
-          if (eventos.botaoPressionado == false || confirmarTempo == Confirmacao::Retornar || confirmarTempo == Confirmacao::Invalido){
-            eventos = lerEventos();
-            if(eventos.botaoHorario || eventos.botaoAntiHorario){
-              if(confirmarTempo == Confirmacao::Confirmar){
-                confirmarTempo = Confirmacao::Retornar;
-              }
-              else{
-                confirmarTempo = Confirmacao::Confirmar;
-              }
-            }
-          }
-        break;
+          break;
         }
 
+        case EtapaConfiguracao::Tempo: {
+          tempoSetado = atualizarConfiguracaoTempo();
+          OpcaoConfirmacao opcaoTempo = OpcaoConfirmacao::Confirmar;
 
-        break;
+          if (!eventosConfiguracao.botaoPressionado ||
+              opcaoTempo == OpcaoConfirmacao::Retornar) {
+            eventosConfiguracao = lerEventos();
+            if (eventosConfiguracao.botaoHorario ||
+                eventosConfiguracao.botaoAntiHorario) {
+              opcaoTempo = opcaoTempo == OpcaoConfirmacao::Confirmar
+                               ? OpcaoConfirmacao::Retornar
+                               : OpcaoConfirmacao::Confirmar;
+            }
+          }
+          break;
+        }
       }
-
       break;
-
-    // case Estado::Configuracao:
-
-    //   while(vazaoSetada == 0){
-    //     Eventos eventos;
-
-    //     vazaoSetada = atualizarConfiguracaoVazao();
-
-    //     Confirmacao confirmarVazao = Confirmacao::Confirmar;
-
-    //       while(eventos.botaoPressionado == false || confirmarVazao == Confirmacao::Retornar || confirmarVazao == Confirmacao::Invalido){
-    //         eventos = lerEventos();
-    //         if(eventos.botaoHorario || eventos.botaoAntiHorario){
-    //           if(confirmarVazao == Confirmacao::Confirmar){
-    //             confirmarVazao = Confirmacao::Retornar;
-    //           }
-    //           else{
-    //             confirmarVazao = Confirmacao::Confirmar;
-    //           }
-    //         }
-    //       }
-          
-    //       Validacao validacaoVazao;
-    //       eventos = lerEventos();
-    //       if (eventos.botaoPressionado == true && vazaoSetada > Config::limiteInferiorVazao && vazaoSetada < Config::limiteSuperiorVazao && confirmarVazao == Confirmacao::Confirmar)
-    //       {
-    //         validacaoVazao = Confirmacao::Valido;
-    //         break;
-    //       }
-    //       else if (eventos.botaoPressionado == true && confirmarVazao == Confirmacao::Confirmar)
-    //       {
-    //         validacaoVazao = Confirmacao::Invalido;
-    //         // tela::ConfiguracaoInvalida("Valor da vazao invalido");
-    //         mudarEstado(Estado::Invalido);
-    //         break;
-    //       }
-    //     }
-    //   }
-
-    //   tempoSetado = 0;
-    //   tempoSetado = atualizarConfiguracaoTempo();
-
-    //   while (tempoSetado == 0){
-    //     Eventos eventos;
-
-    //     tempoSetado = atualizarConfiguracaoTempo();
-
-    //     Confirmacao confirmarTempo = Confirmacao::Confirmar;
-
-    //       while(eventos.botaoPressionado == false){
-    //         eventos = lerEventos();
-    //         if(eventos.botaoHorario || eventos.botaoAntiHorario){
-    //           if(confirmarTempo == Confirmacao::Confirmar){
-    //             confirmarTempo = Confirmacao::Retornar;
-    //           }
-    //           else{
-    //             confirmarTempo = Confirmacao::Confirmar;
-    //           }
-    //         }
-    //       }
-          
-    //       Validacao validacaoTempo;
-    //       eventos = lerEventos();
-    //       if (eventos.botaoPressionado == true && tempoSetado > 0 && tempoSetado < Config::limiteSuperiorTempo && confirmarTempo == Confirmacao::Confirmar)
-    //       {
-    //         validacaoTempo = Validacao::Valido;
-    //         break;
-    //       }
-    //       else if (eventos.botaoPressionado == true && confirmarTempo == Confirmacao::Confirmar){
-    //         validacaoTempo = Validacao::Invalido;
-    //         // tela::ConfiguracaoInvalida("Valor do tempo invalido");
-    //         mudarEstado(Estado::Invalido);
-    //         break;
-    //       }
-    //       else if (confirmarTempo == Confirmacao::Retornar)
-    //     }
-
-    //   if (validacaoVazao == Validacao::Valido && validacaoTempo == Validacao::Valido)
-    //   {
-    //     tela.ConfiguracaoValida(vazaoSetada, tempoSetado);
-    //     mudarEstado(Estado::Validacao);
-    //   }
-    // break;
+    }
 
     case Estado::Validacao:
       if ((vazaoSetada * tempoSetado) < Config::volumeSeginga)
       {
         tela.ConfiguracaoValida(vazaoSetada, tempoSetado);
-        if(eventos.botao2Pressionado == true){
+        if(eventos.botaoPressionado == true){
           mudarEstado(Estado::Execucao);
         }
       }
@@ -346,7 +245,7 @@ namespace
 
     case Estado::Invalido:
       tela.ConfiguracaoInvalida("Volume de medicamento maior q o volume da seringa");
-      if (eventos.botao2Pressionado == true){
+      if (eventos.botaoPressionado == true){
         mudarEstado(Estado::Configuracao);
       }
       break;
