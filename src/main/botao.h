@@ -2,6 +2,7 @@
 
 #include "config.h"
 #include <stdint.h>
+#include <Stream.h>
 
 // Evento emitido uma vez quando o estado eletrico do botao estabiliza.
 enum class EventoBotao : uint8_t {
@@ -26,6 +27,12 @@ class Botao {
 
   void iniciar();
 
+  // Ativa entrada de teste pelo Monitor Serial:
+  // 'a' = anti-horario, 'd' = horario, 's' = botao pressionado.
+  // O encoder fisico continua funcionando quando nao ha tecla disponivel.
+  void configurarEntradaSerial(Stream& entrada);
+  void desativarEntradaSerial();
+
   EventoBotao atualizar(uint32_t agoraMs = millis());
 
  private:
@@ -35,6 +42,7 @@ class Botao {
   uint8_t modoPino_;
   uint8_t nivelPressionado_;
   uint32_t debounceMs_;
+  Stream* entradaSerial_ = nullptr;
   uint32_t instanteUltimaMudanca_ = 0;
   uint8_t leituraAnterior_Botao = HIGH;
   uint8_t estadoEstavel_ = HIGH;
@@ -46,4 +54,5 @@ class Botao {
 
   int lerEncoder();
   EventoBotao lerRotacao();
+  EventoBotao lerEntradaSerial();
 };

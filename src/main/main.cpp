@@ -2,17 +2,17 @@
 #include "botao.h"
 #include "tela.h"
 
-Botao botao(Config::PIN_BOTAO, 
-            Config::PIN_ENCODER_A, 
-            Config::PIN_ENCODER_B, 
-            Config::MODO_BOTOES, 
-            Config::NIVEL_PRESSIONADO, 
+Botao botao(Config::PIN_BOTAO,
+            Config::PIN_ENCODER_A,
+            Config::PIN_ENCODER_B,
+            Config::MODO_BOTOES,
+            Config::NIVEL_PRESSIONADO,
             Config::DEBOUNCE_MS);
 
 Adafruit_ILI9341 display(
-                        Config::PIN_TELA_CS,
-                        Config::PIN_TELA_DC,
-                        Config::PIN_TELA_RST);
+    Config::PIN_TELA_CS,
+    Config::PIN_TELA_DC,
+    Config::PIN_TELA_RST);
 
 Tela tela(display);
 
@@ -22,8 +22,9 @@ enum class Estado
   Configuracao,
   Validacao,
   Invalido,
-  Execucao,
   Falha,
+  Calculo,
+  Execucao,
   Obstrucao,
   Concluido
 };
@@ -65,6 +66,7 @@ struct Eventos
 
 float vazaoSetada = 0;
 uint8_t tempoSetado = 0;
+float frequencia_motor = 0;
 
 namespace
 {
@@ -83,6 +85,8 @@ namespace
       return "Validacao";
     case Estado::Invalido:
       return "Invalido";
+    case Estado::Calculo:
+      return "Calculo";
     case Estado::Execucao:
       return "Execucao";
     case Estado::Falha:
@@ -126,42 +130,73 @@ namespace
   {
     Eventos eventos;
 
-    eventos.botaoPressionado =
-      botao.atualizar() == EventoBotao::Pressionado;
-
-      eventos.botaoHorario = botao.atualizar() == EventoBotao::Horario;
-      eventos.botaoAntiHorario = botao.atualizar() == EventoBotao::AntiHorario;
+    const EventoBotao eventoBotao = botao.atualizar();
+    eventos.botaoPressionado = eventoBotao == EventoBotao::Pressionado;
+    eventos.botaoHorario = eventoBotao == EventoBotao::Horario;
+    eventos.botaoAntiHorario = eventoBotao == EventoBotao::AntiHorario;
 
     return eventos;
   }
 
-  int atualizarConfiguracaoVazao(){
+  int atualizarConfiguracaoVazao()
+  {
     Eventos evento;
     int vazao = 0;
-    while(evento.botaoPressionado == false){
+    while (evento.botaoPressionado == false)
+    {
       evento = lerEventos();
-      if(evento.botaoHorario || evento.botaoAntiHorario && vazao < Config::limiteSuperiorVazao && vazao > Config::limiteInferiorVazao){
+      if (evento.botaoHorario || evento.botaoAntiHorario && vazao < Config::limiteSuperiorVazao && vazao > Config::limiteInferiorVazao)
+      {
         vazao += evento.botaoHorario ? 1 : -1;
       }
     }
     return vazao;
   }
 
-  int atualizarConfiguracaoTempo(){
+  int atualizarConfiguracaoTempo()
+  {
     Eventos evento;
     int tempo = 0;
-    while(evento.botaoPressionado == false){
+    while (evento.botaoPressionado == false)
+    {
       evento = lerEventos();
-      if(evento.botaoHorario || evento.botaoAntiHorario && tempo > 0 && tempo < Config::limiteSuperiorTempo){
+      if (evento.botaoHorario || evento.botaoAntiHorario && tempo > 0 && tempo < Config::limiteSuperiorTempo)
+      {
         tempo += evento.botaoHorario ? 1 : -1;
       }
     }
     return tempo;
   }
 
+  uint32_t calcular_intervalo_passo(float vazao_mL_min)
+  {
+    if (vazao_mL_min <= 0.0f || Config::area_seringa_mm <= 0.0f || Config::volume_seringa_ml <= 0.0f)
+      return 0;
+    if (Config::fuso_avanco_mm_por_volta <= 0.0f)
+      return 0;
+
+    const uint32_t passos_por_volta =
+        (uint32_t)Config::passos_por_volta_motor * Config::microsteps;
+
+    // f [passos/s] = Q * N_m / (0,06 * A * p)
+    const float f = vazao_mL_min * passos_por_volta /
+                    (0.06f * Config::area_seringa_mm * Config::fuso_avanco_mm_por_volta);
+
+    if (f <= 0.0f)
+      return 0;
+
+    const float intervalo_us = 1e6f / f;
+
+    // saturação para não estourar o tipo
+    if (intervalo_us >= 4.0e9f)
+      return 0;
+
+    return (uint32_t)(intervalo_us + 0.5f);
+  }
+
   void atualizarMaquinaDeEstados(const Eventos &eventos)
   {
-    if ((estadoAtual == Estado::Configuracao || estadoAtual == Estado::Execucao) && eventos.falhaDetectada)
+    if ((estadoAtual == Estado::Configuracao || estadoAtual == Estado::Calculo) && eventos.falhaDetectada)
     {
       mudarEstado(Estado::Falha);
       return;
@@ -177,54 +212,60 @@ namespace
       }
       break;
 
-    case Estado::Configuracao: {
+    case Estado::Configuracao:
+    {
       Eventos eventosConfiguracao;
 
-      switch (etapaConfiguracao) {
-        case EtapaConfiguracao::Vazao: {
-          vazaoSetada = atualizarConfiguracaoVazao();
-          OpcaoConfirmacao opcaoVazao = OpcaoConfirmacao::Confirmar;
+      switch (etapaConfiguracao)
+      {
+      case EtapaConfiguracao::Vazao:
+      {
+        vazaoSetada = atualizarConfiguracaoVazao();
+        OpcaoConfirmacao opcaoVazao = OpcaoConfirmacao::Confirmar;
 
-          if (!eventosConfiguracao.botaoPressionado ||
-              opcaoVazao == OpcaoConfirmacao::Retornar) {
-            eventosConfiguracao = lerEventos();
-            if (eventosConfiguracao.botaoHorario ||
-                eventosConfiguracao.botaoAntiHorario) {
-              opcaoVazao = opcaoVazao == OpcaoConfirmacao::Confirmar
-                               ? OpcaoConfirmacao::Retornar
-                               : OpcaoConfirmacao::Confirmar;
-            }
-          } else {
-            eventosConfiguracao = lerEventos();
-            if (eventosConfiguracao.botaoPressionado &&
-                vazaoSetada > Config::limiteInferiorVazao &&
-                vazaoSetada < Config::limiteSuperiorVazao &&
-                opcaoVazao == OpcaoConfirmacao::Confirmar) {
-              etapaConfiguracao = EtapaConfiguracao::Tempo;
-            } else if (eventosConfiguracao.botaoPressionado &&
-                       opcaoVazao == OpcaoConfirmacao::Confirmar) {
-              mudarEstado(Estado::Invalido);
-            }
+        if (!eventosConfiguracao.botaoPressionado ||
+            opcaoVazao == OpcaoConfirmacao::Retornar)
+        {
+          eventosConfiguracao = lerEventos();
+          if (eventosConfiguracao.botaoHorario || eventosConfiguracao.botaoAntiHorario)
+          {
+            opcaoVazao = opcaoVazao == OpcaoConfirmacao::Confirmar
+                             ? OpcaoConfirmacao::Retornar
+                             : OpcaoConfirmacao::Confirmar;
           }
-          break;
         }
-
-        case EtapaConfiguracao::Tempo: {
-          tempoSetado = atualizarConfiguracaoTempo();
-          OpcaoConfirmacao opcaoTempo = OpcaoConfirmacao::Confirmar;
-
-          if (!eventosConfiguracao.botaoPressionado ||
-              opcaoTempo == OpcaoConfirmacao::Retornar) {
-            eventosConfiguracao = lerEventos();
-            if (eventosConfiguracao.botaoHorario ||
-                eventosConfiguracao.botaoAntiHorario) {
-              opcaoTempo = opcaoTempo == OpcaoConfirmacao::Confirmar
-                               ? OpcaoConfirmacao::Retornar
-                               : OpcaoConfirmacao::Confirmar;
-            }
+        else
+        {
+          eventosConfiguracao = lerEventos();
+          if (eventosConfiguracao.botaoPressionado && vazaoSetada > Config::limiteInferiorVazao && vazaoSetada < Config::limiteSuperiorVazao && opcaoVazao == OpcaoConfirmacao::Confirmar)
+          {
+            etapaConfiguracao = EtapaConfiguracao::Tempo;
           }
-          break;
+          else if (eventosConfiguracao.botaoPressionado && opcaoVazao == OpcaoConfirmacao::Confirmar)
+          {
+            mudarEstado(Estado::Invalido);
+          }
         }
+        break;
+      }
+
+      case EtapaConfiguracao::Tempo:
+      {
+        tempoSetado = atualizarConfiguracaoTempo();
+        OpcaoConfirmacao opcaoTempo = OpcaoConfirmacao::Confirmar;
+
+        if (!eventosConfiguracao.botaoPressionado || opcaoTempo == OpcaoConfirmacao::Retornar)
+        {
+          eventosConfiguracao = lerEventos();
+          if (eventosConfiguracao.botaoHorario || eventosConfiguracao.botaoAntiHorario)
+          {
+            opcaoTempo = opcaoTempo == OpcaoConfirmacao::Confirmar
+                             ? OpcaoConfirmacao::Retornar
+                             : OpcaoConfirmacao::Confirmar;
+          }
+        }
+        break;
+      }
       }
       break;
     }
@@ -233,8 +274,9 @@ namespace
       if ((vazaoSetada * tempoSetado) < Config::volumeSeginga)
       {
         tela.ConfiguracaoValida(vazaoSetada, tempoSetado);
-        if(eventos.botaoPressionado == true){
-          mudarEstado(Estado::Execucao);
+        if (eventos.botaoPressionado == true)
+        {
+          mudarEstado(Estado::Calculo);
         }
       }
       else
@@ -245,8 +287,26 @@ namespace
 
     case Estado::Invalido:
       tela.ConfiguracaoInvalida("Volume de medicamento maior q o volume da seringa");
-      if (eventos.botaoPressionado == true){
+      if (eventos.botaoPressionado == true)
+      {
         mudarEstado(Estado::Configuracao);
+      }
+      break;
+
+    case Estado::Calculo:
+      if (Config::volume_seringa_ml >= (vazaoSetada * tempoSetado))
+      {
+        frequencia_motor = calcular_intervalo_passo(vazaoSetada);
+        if(frequencia_motor > 0){
+          mudarEstado(Estado::Execucao);
+        }
+        else{
+          mudarEstado(Estado::Invalido);
+        }
+      }
+      else
+      {
+        mudarEstado(Estado::Invalido);
       }
       break;
 
@@ -261,6 +321,7 @@ namespace
       if (eventos.falhaReconhecida)
       {
         // Depois de resolver e reconhecer a falha, voltar a configurar.
+
         mudarEstado(Estado::Configuracao);
       }
       break;
@@ -280,6 +341,7 @@ void setup()
   Serial.println(nomeDoEstado(estadoAtual));
 
   botao.iniciar();
+  botao.configurarEntradaSerial(Serial);
 
   tela.iniciar();
 }

@@ -62,18 +62,6 @@ int Botao::lerEncoder(){
 }
 
 EventoBotao Botao::lerRotacao(){
-  static const int8_t tabelaTransicoes[16] = {
-     0, -1,  1,  0,
-     1,  0,  0, -1,
-    -1,  0,  0,  1,
-     0,  1, -1,  0
-  };
-
-  estadoAtual_Encoder = lerEncoder();
-  const uint8_t indice = (estadoAnterior_Encoder << 2) | estadoAtual_Encoder;
-  transicoesEncoder_ += tabelaTransicoes[indice];
-  estadoAnterior_Encoder = estadoAtual_Encoder;
-
   if (transicoesEncoder_ >= 4) {
     transicoesEncoder_ = 0;
     return EventoBotao::Horario;

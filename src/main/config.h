@@ -20,4 +20,11 @@ namespace Config {
   constexpr float limiteSuperiorVazao = 750.0f;
   constexpr uint8_t limiteInferiorTempo = 0;
   constexpr uint8_t limiteSuperiorTempo = 61;
+
+  constexpr float volume_seringa_ml = 5.0f; // (ml)
+  constexpr float area_seringa_mm = 1.0f; // (mm)
+
+  constexpr float    fuso_avanco_mm_por_volta = 1.0f;   // fuso de 1 mm/volta
+  constexpr uint16_t passos_por_volta_motor   = 200;    // NEMA17 1.8°
+  constexpr uint16_t microsteps               = 16;     // configurado no driver
 }
