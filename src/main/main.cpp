@@ -1,20 +1,34 @@
 #include "config.h"
 #include "botao.h"
 #include "tela.h"
+#include "fim.h"
+#include "motor.h"
 
 Botao botao(Config::PIN_BOTAO,
             Config::PIN_ENCODER_A,
             Config::PIN_ENCODER_B,
             Config::MODO_BOTOES,
-            Config::NIVEL_PRESSIONADO,
+            Config::NIVEL_PRESSIONADO_BOTAO,
             Config::DEBOUNCE_MS);
 
-Adafruit_ILI9341 display(
-    Config::PIN_TELA_CS,
-    Config::PIN_TELA_DC,
-    Config::PIN_TELA_RST);
+Adafruit_ILI9341 display(Config::PIN_TELA_CS,
+                         Config::PIN_TELA_DC,
+                         Config::PIN_TELA_RST);
 
 Tela tela(display);
+
+Fim fim_superior(Config::PIN_FIM_SUPERIOR,
+                 Config::MODO_FIM,
+                 Config::NIVEL_ATIVO_FIM,
+                 Config::DEBOUNCE_MS_FIM);
+
+Fim fim_inferior(Config::PIN_FIM_INFERIOR,
+                 Config::MODO_FIM,
+                 Config::NIVEL_ATIVO_FIM,
+                 Config::DEBOUNCE_MS_FIM);
+
+Motor motor(Config::PIN_MOTOR,
+            Config::resolucao_motor);
 
 enum class Estado
 {
@@ -135,6 +149,8 @@ namespace
     eventos.botaoHorario = eventoBotao == EventoBotao::Horario;
     eventos.botaoAntiHorario = eventoBotao == EventoBotao::AntiHorario;
 
+    
+
     return eventos;
   }
 
@@ -180,7 +196,7 @@ namespace
 
     // f [passos/s] = Q * N_m / (0,06 * A * p)
     const float f = vazao_mL_min * passos_por_volta /
-                    (0.06f * Config::area_seringa_mm * Config::fuso_avanco_mm_por_volta);
+                  (0.06f * Config::area_seringa_mm * Config::fuso_avanco_mm_por_volta);
 
     if (f <= 0.0f)
       return 0;
@@ -191,7 +207,7 @@ namespace
     if (intervalo_us >= 4.0e9f)
       return 0;
 
-    return (uint32_t)(intervalo_us + 0.5f);
+    return (uint32_t)(1e6f /(intervalo_us + 0.5f)); 
   }
 
   void atualizarMaquinaDeEstados(const Eventos &eventos)
@@ -205,6 +221,7 @@ namespace
     switch (estadoAtual)
     {
     case Estado::Inicio:
+      Serial.println("Inicio");
       tela.Inicio();
       if (eventos.botaoPressionado == true)
       {
@@ -214,12 +231,14 @@ namespace
 
     case Estado::Configuracao:
     {
+      Serial.println("Configurando");
       Eventos eventosConfiguracao;
 
       switch (etapaConfiguracao)
       {
       case EtapaConfiguracao::Vazao:
       {
+        Serial.println("EstapaConfigurando vazao");
         vazaoSetada = atualizarConfiguracaoVazao();
         OpcaoConfirmacao opcaoVazao = OpcaoConfirmacao::Confirmar;
 
@@ -251,6 +270,7 @@ namespace
 
       case EtapaConfiguracao::Tempo:
       {
+        Serial.println("EtapaConfiguracao::Tempo");
         tempoSetado = atualizarConfiguracaoTempo();
         OpcaoConfirmacao opcaoTempo = OpcaoConfirmacao::Confirmar;
 
@@ -271,6 +291,7 @@ namespace
     }
 
     case Estado::Validacao:
+      Serial.println("Estado::Validacao");
       if ((vazaoSetada * tempoSetado) < Config::volumeSeginga)
       {
         tela.ConfiguracaoValida(vazaoSetada, tempoSetado);
@@ -286,6 +307,7 @@ namespace
       break;
 
     case Estado::Invalido:
+      Serial.println("Estado::Invalido");
       tela.ConfiguracaoInvalida("Volume de medicamento maior q o volume da seringa");
       if (eventos.botaoPressionado == true)
       {
@@ -294,6 +316,7 @@ namespace
       break;
 
     case Estado::Calculo:
+      Serial.println("Estado::Calculo");
       if (Config::volume_seringa_ml >= (vazaoSetada * tempoSetado))
       {
         frequencia_motor = calcular_intervalo_passo(vazaoSetada);
@@ -311,6 +334,7 @@ namespace
       break;
 
     case Estado::Execucao:
+
       if (eventos.execucaoConcluida)
       {
         mudarEstado(Estado::Concluido);
@@ -344,6 +368,11 @@ void setup()
   botao.configurarEntradaSerial(Serial);
 
   tela.iniciar();
+
+  fim_superior.iniciar();
+  fim_inferior.iniciar();
+
+
 }
 
 void loop()
