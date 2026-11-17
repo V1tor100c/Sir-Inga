@@ -5,8 +5,8 @@
 #include "motor.h"
 
 Botao botao(Config::PIN_BOTAO,
-            Config::PIN_ENCODER_A,
-            Config::PIN_ENCODER_B,
+            Config::PIN_BOTAO_ENCODER_A,
+            Config::PIN_BOTAO_ENCODER_B,
             Config::MODO_BOTOES,
             Config::NIVEL_PRESSIONADO_BOTAO,
             Config::DEBOUNCE_MS);
@@ -76,6 +76,11 @@ struct Eventos
   bool botaoAntiHorario = false;
 
   bool vazaoConfirmada = false;
+
+  bool fimSuperiorPressionado = false;
+  bool fimSuperiorLiberado = false;
+  bool fimInferiorPressionado = false;
+  bool fimInferiorLiberado = false;
 };
 
 float vazaoSetada = 0;
@@ -149,7 +154,13 @@ namespace
     eventos.botaoHorario = eventoBotao == EventoBotao::Horario;
     eventos.botaoAntiHorario = eventoBotao == EventoBotao::AntiHorario;
 
-    
+    const EventoFim fimSuperior = fim_superior.atualizar();
+    eventos.fimSuperiorPressionado = fimSuperior == EventoFim::Acionado;
+    eventos.fimSuperiorLiberado = fimSuperior == EventoFim::Liberado;
+
+    const EventoFim fimInferior = fim_inferior.atualizar();
+    eventos.fimInferiorPressionado = fimInferior == EventoFim::Acionado;
+    eventos.fimInferiorLiberado = fimInferior == EventoFim::Liberado;
 
     return eventos;
   }
@@ -350,6 +361,10 @@ namespace
       }
       break;
 
+    case Estado::Obstrucao:
+      
+      break;
+
     case Estado::Concluido:
       // Estado terminal da operacao atual. Um novo ciclo pode ser definido depois.
       break;
@@ -365,7 +380,6 @@ void setup()
   Serial.println(nomeDoEstado(estadoAtual));
 
   botao.iniciar();
-  botao.configurarEntradaSerial(Serial);
 
   tela.iniciar();
 

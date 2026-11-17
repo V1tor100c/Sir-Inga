@@ -5,6 +5,9 @@
 namespace Config {
 
   //=-=-=-=-= BOTÃO -=-=-=-=-=
+  constexpr uint8_t PIN_BOTAO = 15;
+  constexpr uint8_t PIN_BOTAO_ENCODER_A = 25;
+  constexpr uint8_t PIN_BOTAO_ENCODER_B = 26;
   constexpr uint8_t MODO_BOTOES = INPUT_PULLUP;
   constexpr uint8_t NIVEL_PRESSIONADO_BOTAO = LOW;
   constexpr uint32_t DEBOUNCE_MS = 30;
@@ -38,13 +41,16 @@ namespace Config {
   constexpr uint16_t microsteps               = 16;     // configurado no driver
 
   //=-=-=-=-= MOTOR -=-=-=-=-=
-  constexpr uint8_t resolucao_motor = 8;
   constexpr uint8_t PIN_MOTOR = 18;
   constexpr uint8_t LIGA_MOTOR = 127;
   constexpr uint8_t DESLIGA_MOTOR = 0;
+  constexpr uint8_t PIN_TROCA_ROTACAO_MOTOR = 16;
+  constexpr uint8_t CANAL_MOTOR = 0;
+  constexpr uint8_t RESOLUCAO_MOTOR = 8;
+  constexpr uint8_t FREQUENCIA_MOTOR_VOLTANDO = 1;
 
   //=-=-=-=-= DRIVE -=-=-=-=-=
   constexpr uint8_t PIN_STEP = 19;
-  constexpr uint8_t PIM_DIR = 20;
+  constexpr uint8_t PIN_DIR = 20;
   constexpr uint8_t PIN_SLEEP = 21;
 }

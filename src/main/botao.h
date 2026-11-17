@@ -1,8 +1,6 @@
 #pragma once
 
 #include "config.h"
-#include <stdint.h>
-#include <Stream.h>
 
 // Evento emitido uma vez quando o estado eletrico do botao estabiliza.
 enum class EventoBotao : uint8_t {
@@ -27,12 +25,6 @@ class Botao {
 
   void iniciar();
 
-  // Ativa entrada de teste pelo Monitor Serial:
-  // 'a' = anti-horario, 'd' = horario, 's' = botao pressionado.
-  // O encoder fisico continua funcionando quando nao ha tecla disponivel.
-  void configurarEntradaSerial(Stream& entrada);
-  void desativarEntradaSerial();
-
   EventoBotao atualizar(uint32_t agoraMs = millis());
 
  private:
@@ -54,5 +46,4 @@ class Botao {
 
   int lerEncoder();
   EventoBotao lerRotacao();
-  EventoBotao lerEntradaSerial();
 };
