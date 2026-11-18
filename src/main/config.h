@@ -53,4 +53,12 @@ namespace Config {
   constexpr uint8_t PIN_STEP = 19;
   constexpr uint8_t PIN_DIR = 20;
   constexpr uint8_t PIN_SLEEP = 21;
+
+  //=-=-=-=-= ENCODER -=-=-=-=-=
+  constexpr uint8_t PIN_ENCODER_A = 25;
+  constexpr uint8_t PIN_ENCODER_B = 26;
+  constexpr uint8_t PIN_ENCODER_SW = 27;
+
+  //=-=-=-=-= BUZZER -=-=-=-=-=
+  constexpr uint8_t PIN_BUZZER = 33;
 }

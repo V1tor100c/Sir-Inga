@@ -4,7 +4,7 @@ void Motor::iniciar(){
     ledcSetup(Config::CANAL_MOTOR, 1000, Config::RESOLUCAO_MOTOR);
     ledcAttachPin(Config::PIN_MOTOR, Config::CANAL_MOTOR);
 
-    ledWrile(Config::CANAL_MOTOR, Config::DESLIGA_MOTOR);
+    ledcWrite(Config::CANAL_MOTOR, Config::DESLIGA_MOTOR);
 }
 
 void Motor::girar(uint8_t freq){

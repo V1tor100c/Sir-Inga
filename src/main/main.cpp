@@ -28,7 +28,7 @@ Fim fim_inferior(Config::PIN_FIM_INFERIOR,
                  Config::DEBOUNCE_MS_FIM);
 
 Motor motor(Config::PIN_MOTOR,
-            Config::resolucao_motor);
+            Config::RESOLUCAO_MOTOR);
 
 enum class Estado
 {
