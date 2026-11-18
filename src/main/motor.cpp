@@ -1,5 +1,10 @@
 #include "motor.h"
 
+Motor::Motor(uint8_t pino, uint8_t resolucao)
+            : pino_(pino),
+            resolucao_(resolucao),
+            freq_(0) {}
+
 void Motor::iniciar(){
     ledcSetup(Config::CANAL_MOTOR, 1000, Config::RESOLUCAO_MOTOR);
     ledcAttachPin(Config::PIN_MOTOR, Config::CANAL_MOTOR);
