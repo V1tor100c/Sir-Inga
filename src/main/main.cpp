@@ -3,6 +3,7 @@
 #include "tela.h"
 #include "fim.h"
 #include "motor.h"
+#include "buzzer.h"
 
 Botao botao(Config::PIN_BOTAO,
             Config::PIN_BOTAO_ENCODER_A,
@@ -27,8 +28,10 @@ Fim fim_inferior(Config::PIN_FIM_INFERIOR,
                  Config::NIVEL_ATIVO_FIM,
                  Config::DEBOUNCE_MS_FIM);
 
-Motor motor(Config::PIN_MOTOR,
+Motor motor(Config::PIN_STEP,
             Config::RESOLUCAO_MOTOR);
+
+Buzzer buzzer(Config::PIN_BUZZER);
 
 enum class Estado
 {
@@ -356,8 +359,11 @@ namespace
       if (eventos.falhaReconhecida)
       {
         // Depois de resolver e reconhecer a falha, voltar a configurar.
-
-        mudarEstado(Estado::Configuracao);
+        buzzer.tocar();
+        // display.Falha("Motor falhou");
+        if (eventos.botaoPressionado == true){
+          mudarEstado(Estado::Configuracao);
+        }
       }
       break;
 
@@ -386,7 +392,9 @@ void setup()
   fim_superior.iniciar();
   fim_inferior.iniciar();
 
+  motor.iniciar();
 
+  buzzer.iniciar();
 }
 
 void loop()

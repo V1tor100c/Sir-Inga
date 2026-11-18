@@ -15,8 +15,8 @@ Botao::Botao(uint8_t pino,
 
 void Botao::iniciar() {
   pinMode(pino_, modoPino_);
-  pinMode(pino_encoderA_, INPUT_PULLUP);
-  pinMode(pino_encoderB_, INPUT_PULLUP);
+  pinMode(pino_encoderA_, INPUT);
+  pinMode(pino_encoderB_, INPUT);
 
   // Assume o nivel atual como inicial; nao gera clique falso ao ligar.
   leituraAnterior_Botao = digitalRead(pino_);
