@@ -360,7 +360,7 @@ namespace
       {
         // Depois de resolver e reconhecer a falha, voltar a configurar.
         buzzer.tocar();
-        // display.Falha("Motor falhou");
+        tela.Falha("Motor falhou");
         if (eventos.botaoPressionado == true){
           mudarEstado(Estado::Configuracao);
         }
@@ -403,3 +403,15 @@ void loop()
   atualizarMaquinaDeEstados(eventos);
   delay(10);
 }
+
+
+// #include <Arduino.h>
+
+// void setup()
+// {
+//   Serial.begin(115200);
+// }
+
+// void loop()
+// {
+// }
