@@ -84,7 +84,11 @@ void ControleMotor::processarComando(const ComandoMotor &comando,
             static_cast<uint32_t>(Config::limiteInferiorTempoMin) * 60UL ||
         comando.duracaoSegundos >
             static_cast<uint32_t>(Config::limiteSuperiorTempoMin) * 60UL ||
-        volumeComandadoMl > Config::volume_seringa_ml) {
+        volumeComandadoMl > Config::volume_seringa_ml ||
+        Config::TRANSICOES_ENCODER_POR_VOLTA == 0 ||
+        Config::passos_por_volta_motor == 0 || Config::microsteps == 0 ||
+        (Config::SINAL_ENCODER_AVANCO != 1 &&
+         Config::SINAL_ENCODER_AVANCO != -1)) {
       registrarFalha(FalhaMotor::ParametrosInvalidos);
       return;
     }
@@ -212,12 +216,16 @@ void ControleMotor::executar() {
       contagemAnterior_ = contagemAtual;
       estado_.contagemEncoder = contagemAtual;
 
-      const float rpmMedido = fabsf(static_cast<float>(diferencaContagem)) * 60.0f /
+      const float contagensNoSentidoAvanco =
+          static_cast<float>(diferencaContagem) * Config::SINAL_ENCODER_AVANCO;
+      const float rpmMedido = contagensNoSentidoAvanco * 60.0f /
                               (Config::TRANSICOES_ENCODER_POR_VOLTA * dtSegundos);
       estado_.rpmMedido = rpmMedido;
       estado_.vazaoEstimadaMlPorHora = calcularVazaoEstimada(rpmMedido);
 
-      if (diferencaContagem != 0) {
+      if (contagensNoSentidoAvanco < 0.0f) {
+        registrarFalha(FalhaMotor::SentidoIncorreto);
+      } else if (contagensNoSentidoAvanco > 0.0f) {
         movimentoDetectado_ = true;
         instanteUltimoMovimentoMs_ = agoraMs;
       }
@@ -225,9 +233,10 @@ void ControleMotor::executar() {
       const uint32_t limiteSemMovimentoMs = movimentoDetectado_
           ? Config::TEMPO_MAXIMO_SEM_MOVIMENTO_MS
           : Config::TEMPO_MAXIMO_PARTIDA_MS;
-      if ((uint32_t)(agoraMs - instanteUltimoMovimentoMs_) >= limiteSemMovimentoMs) {
+      if (estado_.executando &&
+          (uint32_t)(agoraMs - instanteUltimoMovimentoMs_) >= limiteSemMovimentoMs) {
         registrarFalha(FalhaMotor::SemMovimento);
-      } else {
+      } else if (estado_.executando) {
         const float erroRpm = rpmAlvo_ - rpmMedido;
         const float passosPorVolta = static_cast<float>(Config::passos_por_volta_motor) *
                                      Config::microsteps;

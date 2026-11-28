@@ -53,6 +53,9 @@ constexpr uint8_t PIN_ENCODER_EIXO_B = 15;
 constexpr uint8_t PIN_ENCODER_EIXO_INDEX = 13;
 // Placeholder: confirmar quantas transicoes A/B a classe conta por volta.
 constexpr uint32_t TRANSICOES_ENCODER_POR_VOLTA = 4096;
+// Ajustar na bancada para que uma contagem positiva corresponda ao avanco do embolo.
+// Use +1 ou -1 conforme a orientacao eletrica/mecanica do encoder.
+constexpr int8_t SINAL_ENCODER_AVANCO = 1;
 
 // Controle e tarefas FreeRTOS. Valores iniciais para prototipo de bancada.
 constexpr uint32_t PERIODO_TAREFA_CONTROLE_MS = 10;

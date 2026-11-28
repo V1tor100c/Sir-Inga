@@ -26,6 +26,7 @@ enum class FalhaMotor : uint8_t {
   Driver,
   FimDeCurso,
   SemMovimento,
+  SentidoIncorreto,
   FrequenciaInvalida,
   ParametrosInvalidos
 };

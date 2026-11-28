@@ -67,6 +67,8 @@ const char *mensagemFalha(FalhaMotor falha) {
     return "Fim de curso acionado";
   case FalhaMotor::SemMovimento:
     return "Eixo sem movimento; verifique o mecanismo";
+  case FalhaMotor::SentidoIncorreto:
+    return "Eixo girando no sentido incorreto";
   case FalhaMotor::FrequenciaInvalida:
     return "Frequencia de passos invalida";
   case FalhaMotor::ParametrosInvalidos:
@@ -144,6 +146,7 @@ void tarefaInterface(void *) {
   uint32_t duracaoExecucaoSegundos = 0;
   uint32_t ultimaAtualizacaoTelaMs = 0;
   bool telaSuja = true;
+  bool motorIniciouEstaExecucao = false;
 
   for (;;) {
     const uint32_t agoraMs = millis();
@@ -151,17 +154,22 @@ void tarefaInterface(void *) {
     if (xQueuePeek(filaEstadoMotor, &novoEstadoMotor, 0) == pdTRUE) {
       estadoMotor = novoEstadoMotor;
     }
+    if (estado == EstadoInterface::Execucao && estadoMotor.executando) {
+      motorIniciouEstaExecucao = true;
+    }
 
     if (estadoMotor.falha != FalhaMotor::Nenhuma &&
         estado != EstadoInterface::Falha) {
       estado = EstadoInterface::Falha;
       buzzer.tocar();
       telaSuja = true;
-    } else if (estado == EstadoInterface::Execucao && estadoMotor.concluido) {
+    } else if (estado == EstadoInterface::Execucao &&
+               motorIniciouEstaExecucao && estadoMotor.concluido) {
       estado = EstadoInterface::Concluido;
       buzzer.parar();
       telaSuja = true;
-    } else if (estado == EstadoInterface::Execucao && !estadoMotor.executando) {
+    } else if (estado == EstadoInterface::Execucao &&
+               motorIniciouEstaExecucao && !estadoMotor.executando) {
       // Uma parada solicitada pelo usuario retorna a tela ao inicio.
       estado = EstadoInterface::Inicio;
       buzzer.parar();
@@ -237,6 +245,7 @@ void tarefaInterface(void *) {
         if (enviarComando(comando)) {
           inicioExecucaoMs = agoraMs;
           duracaoExecucaoSegundos = comando.duracaoSegundos;
+          motorIniciouEstaExecucao = false;
           estado = EstadoInterface::Execucao;
         } else {
           erroConfiguracao = "Nao foi possivel enviar o comando";
@@ -263,7 +272,6 @@ void tarefaInterface(void *) {
 
     case EstadoInterface::Falha:
       if (pressionado) {
-        buzzer.parar();
         ComandoMotor comando;
         comando.tipo = TipoComandoMotor::ReconhecerFalha;
         enviarComando(comando);
