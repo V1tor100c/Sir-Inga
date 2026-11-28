@@ -118,8 +118,18 @@ void Tela::Confirmacao(float vazaoMlPorHora, uint8_t tempoMinutos) {
   display_.println("Confira os parametros antes de continuar");
 }
 
-void Tela::ConfiguracaoValida(float vazaoMLPorHora, uint8_t tempoMinutos){
-
+void Tela::ConfiguracaoValida(float vazaoMlPorHora, uint8_t tempoMinutos) {
+  desenharBase("CONFIGURACAO VALIDA", ILI9341_DARKGREEN);
+  desenharVazao(vazaoMlPorHora, 76);
+  display_.setTextColor(kCorTexto);
+  display_.setTextSize(2);
+  display_.setCursor(18, 116);
+  display_.print("Tempo: ");
+  display_.print(tempoMinutos);
+  display_.println(" min");
+  display_.setTextColor(kCorRealce);
+  display_.setCursor(18, 184);
+  display_.println("Pressione para iniciar");
 }
 
 void Tela::ConfiguracaoInvalida(const char* mensagem) {
@@ -127,18 +137,30 @@ void Tela::ConfiguracaoInvalida(const char* mensagem) {
   desenharMensagem(mensagem != nullptr ? mensagem : "Verifique os valores", kCorAlerta);
 }
 
-void Tela::Execucao(float vazaoMlPorHora, uint8_t tempoRestanteMinutos) {
+void Tela::Execucao(float vazaoAlvoMlPorHora,
+                    float vazaoEstimadaMlPorHora,
+                    float rpmMedido,
+                    uint8_t tempoRestanteMinutos) {
   desenharBase("INFUSAO EM ANDAMENTO", ILI9341_DARKGREEN);
-  desenharVazao(vazaoMlPorHora, 82);
+  desenharVazao(vazaoAlvoMlPorHora, 54);
   display_.setTextColor(kCorTexto);
   display_.setTextSize(2);
-  display_.setCursor(18, 122);
+  display_.setCursor(18, 88);
+  display_.print("Estimada: ");
+  display_.print(vazaoEstimadaMlPorHora, 1);
+  display_.println(" mL/h");
+  display_.setCursor(18, 120);
+  display_.print("Eixo: ");
+  display_.print(rpmMedido, 1);
+  display_.println(" RPM");
+  display_.setCursor(18, 152);
   display_.print("Restante: ");
   display_.print(tempoRestanteMinutos);
   display_.println(" min");
   display_.setTextColor(kCorAlerta);
-  display_.setCursor(18, 176);
-  display_.println("Somente demonstracao de bancada");
+  display_.setTextSize(1);
+  display_.setCursor(18, 188);
+  display_.println("Pressione o encoder para parar");
 }
 
 
@@ -148,7 +170,7 @@ void Tela::Falha(const char* mensagem) {
   display_.setTextColor(kCorTexto);
   display_.setTextSize(1);
   display_.setCursor(16, 184);
-  display_.println("Motor deve permanecer parado neste estado");
+  display_.println("Elimine a causa e pressione para reconhecer");
 }
 
 void Tela::Obstrucao() {

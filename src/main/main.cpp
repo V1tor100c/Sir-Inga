@@ -1,9 +1,29 @@
-#include "config.h"
 #include "botao.h"
-#include "tela.h"
+#include "buzzer.h"
+#include "config.h"
+#include "controle_motor.h"
+#include "encoder.h"
 #include "fim.h"
 #include "motor.h"
-#include "buzzer.h"
+#include "tela.h"
+
+#include <Adafruit_ILI9341.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
+#include <freertos/task.h>
+
+namespace {
+
+enum class EstadoInterface : uint8_t {
+  Inicio,
+  ConfigurarVazao,
+  ConfigurarTempo,
+  Confirmar,
+  ConfiguracaoInvalida,
+  Execucao,
+  Falha,
+  Concluido
+};
 
 Botao botao(Config::PIN_BOTAO,
             Config::PIN_BOTAO_ENCODER_A,
@@ -15,403 +35,326 @@ Botao botao(Config::PIN_BOTAO,
 Adafruit_ILI9341 display(Config::PIN_TELA_CS,
                          Config::PIN_TELA_DC,
                          Config::PIN_TELA_RST);
-
 Tela tela(display);
 
-Fim fim_superior(Config::PIN_FIM_SUPERIOR,
-                 Config::MODO_FIM,
-                 Config::NIVEL_ATIVO_FIM,
-                 Config::DEBOUNCE_MS_FIM);
+Fim fimSuperior(Config::PIN_FIM_SUPERIOR,
+                Config::MODO_FIM,
+                Config::NIVEL_ATIVO_FIM,
+                Config::DEBOUNCE_MS_FIM);
+Fim fimInferior(Config::PIN_FIM_INFERIOR,
+                Config::MODO_FIM,
+                Config::NIVEL_ATIVO_FIM,
+                Config::DEBOUNCE_MS_FIM);
 
-Fim fim_inferior(Config::PIN_FIM_INFERIOR,
-                 Config::MODO_FIM,
-                 Config::NIVEL_ATIVO_FIM,
-                 Config::DEBOUNCE_MS_FIM);
-
-Motor motor(Config::PIN_STEP,
-            Config::RESOLUCAO_MOTOR);
-
+Motor motor(Config::PIN_STEP, Config::RESOLUCAO_MOTOR);
+EncoderEixo encoderEixo;
 Buzzer buzzer(Config::PIN_BUZZER);
+ControleMotor controleMotor(motor, encoderEixo, fimSuperior, fimInferior);
 
-enum class Estado
-{
-  Inicio,
-  Configuracao,
-  Validacao,
-  Invalido,
-  Falha,
-  Calculo,
-  Execucao,
-  Obstrucao,
-  Concluido
-};
+QueueHandle_t filaComandosMotor = nullptr;
+QueueHandle_t filaEstadoMotor = nullptr;
 
-enum class EtapaConfiguracao
-{
-  Vazao,
-  Tempo
-};
+bool enviarComando(const ComandoMotor &comando) {
+  return filaComandosMotor != nullptr &&
+         xQueueSend(filaComandosMotor, &comando, 0) == pdTRUE;
+}
 
-enum class ResultadoValidacao
-{
-  Valido,
-  Invalido
-};
+const char *mensagemFalha(FalhaMotor falha) {
+  switch (falha) {
+  case FalhaMotor::Driver:
+    return "Falha no driver do motor";
+  case FalhaMotor::FimDeCurso:
+    return "Fim de curso acionado";
+  case FalhaMotor::SemMovimento:
+    return "Eixo sem movimento; verifique o mecanismo";
+  case FalhaMotor::FrequenciaInvalida:
+    return "Frequencia de passos invalida";
+  case FalhaMotor::ParametrosInvalidos:
+    return "Parametros fora dos limites";
+  case FalhaMotor::Nenhuma:
+    break;
+  }
+  return "Falha desconhecida";
+}
 
-enum class OpcaoConfirmacao
-{
-  Confirmar,
-  Retornar
-};
-
-struct Eventos
-{
-  bool configuracaoConfirmada = false;
-  bool execucaoConcluida = false;
-  bool falhaDetectada = false;
-  bool falhaReconhecida = false;
-  bool obstrucaoDetectada = false;
-  bool obstrucaoResolvida = false;
-  bool concluido = false;
-
-  bool botaoPressionado = false;
-  bool botaoHorario = false;
-  bool botaoAntiHorario = false;
-
-  bool vazaoConfirmada = false;
-
-  bool fimSuperiorPressionado = false;
-  bool fimSuperiorLiberado = false;
-  bool fimInferiorPressionado = false;
-  bool fimInferiorLiberado = false;
-};
-
-float vazaoSetada = 0;
-uint8_t tempoSetado = 0;
-float frequencia_motor = 0;
-
-namespace
-{
-
-  Estado estadoAtual = Estado::Inicio;
-
-  const char *nomeDoEstado(Estado estado)
-  {
-    switch (estado)
-    {
-    case Estado::Inicio:
-      return "Inicio";
-    case Estado::Configuracao:
-      return "Configuracao";
-    case Estado::Validacao:
-      return "Validacao";
-    case Estado::Invalido:
-      return "Invalido";
-    case Estado::Calculo:
-      return "Calculo";
-    case Estado::Execucao:
-      return "Execucao";
-    case Estado::Falha:
-      return "Falha";
-    case Estado::Obstrucao:
-      return "Obstrucao";
-    case Estado::Concluido:
-      return "Concluido";
-    }
-    return "Estado desconhecido";
+bool vazaoCabeNaFaixaDoMotor(float vazaoMlPorHora) {
+  if (Config::area_seringa_mm2 <= 0.0f ||
+      Config::fuso_avanco_mm_por_volta <= 0.0f) {
+    return false;
   }
 
-  EtapaConfiguracao etapaConfiguracao = EtapaConfiguracao::Vazao;
+  const float passosPorVolta =
+      static_cast<float>(Config::passos_por_volta_motor) * Config::microsteps;
+  const float rpm = vazaoMlPorHora * 1000.0f /
+                    (60.0f * Config::area_seringa_mm2 *
+                     Config::fuso_avanco_mm_por_volta);
+  const float frequenciaPassosHz = rpm * passosPorVolta / 60.0f;
 
-  const char *nomeDaEtapaConfiguracao(EtapaConfiguracao etapa)
-  {
-    switch (etapa)
-    {
-    case EtapaConfiguracao::Vazao:
-      return "Vazao";
-    case EtapaConfiguracao::Tempo:
-      return "Tempo";
-    }
-    return "Configuracao desconhecida";
+  return frequenciaPassosHz >= Config::FREQUENCIA_PASSO_MIN_HZ &&
+         frequenciaPassosHz <= Config::FREQUENCIA_PASSO_MAX_HZ;
+}
+
+void desenharEstado(EstadoInterface estado,
+                    float vazaoMlPorHora,
+                    uint8_t tempoMinutos,
+                    const EstadoControleMotor &estadoMotor,
+                    const char *erroConfiguracao,
+                    uint32_t segundosRestantes) {
+  switch (estado) {
+  case EstadoInterface::Inicio:
+    tela.Inicio();
+    break;
+  case EstadoInterface::ConfigurarVazao:
+    tela.ConfiguracaoVazao(vazaoMlPorHora);
+    break;
+  case EstadoInterface::ConfigurarTempo:
+    tela.ConfiguracaoTempo(tempoMinutos);
+    break;
+  case EstadoInterface::Confirmar:
+    tela.Confirmacao(vazaoMlPorHora, tempoMinutos);
+    break;
+  case EstadoInterface::ConfiguracaoInvalida:
+    tela.ConfiguracaoInvalida(erroConfiguracao);
+    break;
+  case EstadoInterface::Execucao: {
+    const uint8_t minutosRestantes = static_cast<uint8_t>(
+        (segundosRestantes + 59) / 60);
+    tela.Execucao(estadoMotor.vazaoAlvoMlPorHora,
+                  estadoMotor.vazaoEstimadaMlPorHora,
+                  estadoMotor.rpmMedido,
+                  minutosRestantes);
+    break;
   }
+  case EstadoInterface::Falha:
+    tela.Falha(mensagemFalha(estadoMotor.falha));
+    break;
+  case EstadoInterface::Concluido:
+    tela.Concluido();
+    break;
+  }
+}
 
-  void mudarEstado(Estado novoEstado)
-  {
+void tarefaInterface(void *) {
+  EstadoInterface estado = EstadoInterface::Inicio;
+  EstadoControleMotor estadoMotor;
+  float vazaoSetadaMlPorHora = Config::limiteInferiorVazao;
+  uint8_t tempoSetadoMinutos = Config::limiteInferiorTempoMin;
+  const char *erroConfiguracao = "Verifique os parametros";
+  uint32_t inicioExecucaoMs = 0;
+  uint32_t duracaoExecucaoSegundos = 0;
+  uint32_t ultimaAtualizacaoTelaMs = 0;
+  bool telaSuja = true;
 
-    if (novoEstado == estadoAtual)
-    {
-      return;
+  for (;;) {
+    const uint32_t agoraMs = millis();
+    EstadoControleMotor novoEstadoMotor;
+    if (xQueuePeek(filaEstadoMotor, &novoEstadoMotor, 0) == pdTRUE) {
+      estadoMotor = novoEstadoMotor;
     }
 
-    estadoAtual = novoEstado;
-    Serial.print("Estado: ");
-    Serial.println(nomeDoEstado(estadoAtual));
-  }
-
-  Eventos lerEventos()
-  {
-    Eventos eventos;
-
-    const EventoBotao eventoBotao = botao.atualizar();
-    eventos.botaoPressionado = eventoBotao == EventoBotao::Pressionado;
-    eventos.botaoHorario = eventoBotao == EventoBotao::Horario;
-    eventos.botaoAntiHorario = eventoBotao == EventoBotao::AntiHorario;
-
-    const EventoFim fimSuperior = fim_superior.atualizar();
-    eventos.fimSuperiorPressionado = fimSuperior == EventoFim::Acionado;
-    eventos.fimSuperiorLiberado = fimSuperior == EventoFim::Liberado;
-
-    const EventoFim fimInferior = fim_inferior.atualizar();
-    eventos.fimInferiorPressionado = fimInferior == EventoFim::Acionado;
-    eventos.fimInferiorLiberado = fimInferior == EventoFim::Liberado;
-
-    return eventos;
-  }
-
-  int atualizarConfiguracaoVazao()
-  {
-    Eventos evento;
-    int vazao = 0;
-    while (evento.botaoPressionado == false)
-    {
-      evento = lerEventos();
-      if (evento.botaoHorario || evento.botaoAntiHorario && vazao < Config::limiteSuperiorVazao && vazao > Config::limiteInferiorVazao)
-      {
-        vazao += evento.botaoHorario ? 1 : -1;
-      }
-    }
-    return vazao;
-  }
-
-  int atualizarConfiguracaoTempo()
-  {
-    Eventos evento;
-    int tempo = 0;
-    while (evento.botaoPressionado == false)
-    {
-      evento = lerEventos();
-      if (evento.botaoHorario || evento.botaoAntiHorario && tempo > 0 && tempo < Config::limiteSuperiorTempo)
-      {
-        tempo += evento.botaoHorario ? 1 : -1;
-      }
-    }
-    return tempo;
-  }
-
-  uint32_t calcular_intervalo_passo(float vazao_mL_min)
-  {
-    if (vazao_mL_min <= 0.0f || Config::area_seringa_mm <= 0.0f || Config::volume_seringa_ml <= 0.0f)
-      return 0;
-    if (Config::fuso_avanco_mm_por_volta <= 0.0f)
-      return 0;
-
-    const uint32_t passos_por_volta =
-        (uint32_t)Config::passos_por_volta_motor * Config::microsteps;
-
-    // f [passos/s] = Q * N_m / (0,06 * A * p)
-    const float f = vazao_mL_min * passos_por_volta /
-                  (0.06f * Config::area_seringa_mm * Config::fuso_avanco_mm_por_volta);
-
-    if (f <= 0.0f)
-      return 0;
-
-    const float intervalo_us = 1e6f / f;
-
-    // saturação para não estourar o tipo
-    if (intervalo_us >= 4.0e9f)
-      return 0;
-
-    return (uint32_t)(1e6f /(intervalo_us + 0.5f)); 
-  }
-
-  void atualizarMaquinaDeEstados(const Eventos &eventos)
-  {
-    if ((estadoAtual == Estado::Configuracao || estadoAtual == Estado::Calculo) && eventos.falhaDetectada)
-    {
-      mudarEstado(Estado::Falha);
-      return;
+    if (estadoMotor.falha != FalhaMotor::Nenhuma &&
+        estado != EstadoInterface::Falha) {
+      estado = EstadoInterface::Falha;
+      buzzer.tocar();
+      telaSuja = true;
+    } else if (estado == EstadoInterface::Execucao && estadoMotor.concluido) {
+      estado = EstadoInterface::Concluido;
+      buzzer.parar();
+      telaSuja = true;
+    } else if (estado == EstadoInterface::Execucao && !estadoMotor.executando) {
+      // Uma parada solicitada pelo usuario retorna a tela ao inicio.
+      estado = EstadoInterface::Inicio;
+      buzzer.parar();
+      telaSuja = true;
+    } else if (estado == EstadoInterface::Falha &&
+               estadoMotor.falha == FalhaMotor::Nenhuma) {
+      estado = EstadoInterface::Inicio;
+      buzzer.parar();
+      telaSuja = true;
     }
 
-    switch (estadoAtual)
-    {
-    case Estado::Inicio:
-      Serial.println("Inicio");
-      tela.Inicio();
-      if (eventos.botaoPressionado == true)
-      {
-        mudarEstado(Estado::Configuracao);
+    const EventoBotao evento = botao.atualizar(agoraMs);
+    const bool pressionado = evento == EventoBotao::Pressionado;
+    const bool girouHorario = evento == EventoBotao::Horario;
+    const bool girouAntiHorario = evento == EventoBotao::AntiHorario;
+    const int8_t direcaoRotacao = girouHorario ? 1 : (girouAntiHorario ? -1 : 0);
+
+    switch (estado) {
+    case EstadoInterface::Inicio:
+      if (pressionado) {
+        vazaoSetadaMlPorHora = Config::limiteInferiorVazao;
+        estado = EstadoInterface::ConfigurarVazao;
+        telaSuja = true;
       }
       break;
 
-    case Estado::Configuracao:
-    {
-      Serial.println("Configurando");
-      Eventos eventosConfiguracao;
+    case EstadoInterface::ConfigurarVazao:
+      if (direcaoRotacao != 0) {
+        vazaoSetadaMlPorHora = constrain(
+            vazaoSetadaMlPorHora + direcaoRotacao,
+            Config::limiteInferiorVazao,
+            Config::limiteSuperiorVazao);
+        telaSuja = true;
+      }
+      if (pressionado) {
+        tempoSetadoMinutos = Config::limiteInferiorTempoMin;
+        estado = EstadoInterface::ConfigurarTempo;
+        telaSuja = true;
+      }
+      break;
 
-      switch (etapaConfiguracao)
-      {
-      case EtapaConfiguracao::Vazao:
-      {
-        Serial.println("EstapaConfigurando vazao");
-        vazaoSetada = atualizarConfiguracaoVazao();
-        OpcaoConfirmacao opcaoVazao = OpcaoConfirmacao::Confirmar;
-
-        if (!eventosConfiguracao.botaoPressionado ||
-            opcaoVazao == OpcaoConfirmacao::Retornar)
-        {
-          eventosConfiguracao = lerEventos();
-          if (eventosConfiguracao.botaoHorario || eventosConfiguracao.botaoAntiHorario)
-          {
-            opcaoVazao = opcaoVazao == OpcaoConfirmacao::Confirmar
-                             ? OpcaoConfirmacao::Retornar
-                             : OpcaoConfirmacao::Confirmar;
-          }
+    case EstadoInterface::ConfigurarTempo:
+      if (direcaoRotacao != 0) {
+        const int tempoNovo = static_cast<int>(tempoSetadoMinutos) + direcaoRotacao;
+        tempoSetadoMinutos = constrain(
+            tempoNovo,
+            static_cast<int>(Config::limiteInferiorTempoMin),
+            static_cast<int>(Config::limiteSuperiorTempoMin));
+        telaSuja = true;
+      }
+      if (pressionado) {
+        const float volumeEstimadoMl =
+            vazaoSetadaMlPorHora * tempoSetadoMinutos / 60.0f;
+        if (volumeEstimadoMl > Config::volume_seringa_ml) {
+          erroConfiguracao = "Volume excede o volume da seringa";
+          estado = EstadoInterface::ConfiguracaoInvalida;
+        } else if (!vazaoCabeNaFaixaDoMotor(vazaoSetadaMlPorHora)) {
+          erroConfiguracao = "Vazao fora da faixa do motor";
+          estado = EstadoInterface::ConfiguracaoInvalida;
+        } else {
+          estado = EstadoInterface::Confirmar;
         }
-        else
-        {
-          eventosConfiguracao = lerEventos();
-          if (eventosConfiguracao.botaoPressionado && vazaoSetada > Config::limiteInferiorVazao && vazaoSetada < Config::limiteSuperiorVazao && opcaoVazao == OpcaoConfirmacao::Confirmar)
-          {
-            etapaConfiguracao = EtapaConfiguracao::Tempo;
-          }
-          else if (eventosConfiguracao.botaoPressionado && opcaoVazao == OpcaoConfirmacao::Confirmar)
-          {
-            mudarEstado(Estado::Invalido);
-          }
-        }
-        break;
+        telaSuja = true;
       }
+      break;
 
-      case EtapaConfiguracao::Tempo:
-      {
-        Serial.println("EtapaConfiguracao::Tempo");
-        tempoSetado = atualizarConfiguracaoTempo();
-        OpcaoConfirmacao opcaoTempo = OpcaoConfirmacao::Confirmar;
-
-        if (!eventosConfiguracao.botaoPressionado || opcaoTempo == OpcaoConfirmacao::Retornar)
-        {
-          eventosConfiguracao = lerEventos();
-          if (eventosConfiguracao.botaoHorario || eventosConfiguracao.botaoAntiHorario)
-          {
-            opcaoTempo = opcaoTempo == OpcaoConfirmacao::Confirmar
-                             ? OpcaoConfirmacao::Retornar
-                             : OpcaoConfirmacao::Confirmar;
-          }
+    case EstadoInterface::Confirmar:
+      if (pressionado) {
+        ComandoMotor comando;
+        comando.tipo = TipoComandoMotor::Iniciar;
+        comando.vazaoMlPorHora = vazaoSetadaMlPorHora;
+        comando.duracaoSegundos = static_cast<uint32_t>(tempoSetadoMinutos) * 60UL;
+        if (enviarComando(comando)) {
+          inicioExecucaoMs = agoraMs;
+          duracaoExecucaoSegundos = comando.duracaoSegundos;
+          estado = EstadoInterface::Execucao;
+        } else {
+          erroConfiguracao = "Nao foi possivel enviar o comando";
+          estado = EstadoInterface::ConfiguracaoInvalida;
         }
-        break;
+        telaSuja = true;
       }
+      break;
+
+    case EstadoInterface::ConfiguracaoInvalida:
+      if (pressionado) {
+        estado = EstadoInterface::ConfigurarVazao;
+        telaSuja = true;
+      }
+      break;
+
+    case EstadoInterface::Execucao:
+      if (pressionado) {
+        ComandoMotor comando;
+        comando.tipo = TipoComandoMotor::Parar;
+        enviarComando(comando);
+      }
+      break;
+
+    case EstadoInterface::Falha:
+      if (pressionado) {
+        buzzer.parar();
+        ComandoMotor comando;
+        comando.tipo = TipoComandoMotor::ReconhecerFalha;
+        enviarComando(comando);
+      }
+      break;
+
+    case EstadoInterface::Concluido:
+      if (pressionado) {
+        estado = EstadoInterface::Inicio;
+        telaSuja = true;
       }
       break;
     }
 
-    case Estado::Validacao:
-      Serial.println("Estado::Validacao");
-      if ((vazaoSetada * tempoSetado) < Config::volumeSeginga)
-      {
-        tela.ConfiguracaoValida(vazaoSetada, tempoSetado);
-        if (eventos.botaoPressionado == true)
-        {
-          mudarEstado(Estado::Calculo);
-        }
+    const bool atualizacaoPeriodica =
+        estado == EstadoInterface::Execucao && (uint32_t)(agoraMs - ultimaAtualizacaoTelaMs) >= 1000;
+    if (telaSuja || atualizacaoPeriodica) {
+      uint32_t segundosRestantes = 0;
+      if (estado == EstadoInterface::Execucao) {
+        const uint32_t segundosDecorridos = (agoraMs - inicioExecucaoMs) / 1000UL;
+        segundosRestantes = segundosDecorridos >= duracaoExecucaoSegundos
+                                ? 0
+                                : duracaoExecucaoSegundos - segundosDecorridos;
       }
-      else
-      {
-        mudarEstado(Estado::Invalido);
-      }
-      break;
-
-    case Estado::Invalido:
-      Serial.println("Estado::Invalido");
-      tela.ConfiguracaoInvalida("Volume de medicamento maior q o volume da seringa");
-      if (eventos.botaoPressionado == true)
-      {
-        mudarEstado(Estado::Configuracao);
-      }
-      break;
-
-    case Estado::Calculo:
-      Serial.println("Estado::Calculo");
-      if (Config::volume_seringa_ml >= (vazaoSetada * tempoSetado))
-      {
-        frequencia_motor = calcular_intervalo_passo(vazaoSetada);
-        if(frequencia_motor > 0){
-          mudarEstado(Estado::Execucao);
-        }
-        else{
-          mudarEstado(Estado::Invalido);
-        }
-      }
-      else
-      {
-        mudarEstado(Estado::Invalido);
-      }
-      break;
-
-    case Estado::Execucao:
-
-      if (eventos.execucaoConcluida)
-      {
-        mudarEstado(Estado::Concluido);
-      }
-      break;
-
-    case Estado::Falha:
-      if (eventos.falhaReconhecida)
-      {
-        // Depois de resolver e reconhecer a falha, voltar a configurar.
-        buzzer.tocar();
-        tela.Falha("Motor falhou");
-        if (eventos.botaoPressionado == true){
-          mudarEstado(Estado::Configuracao);
-        }
-      }
-      break;
-
-    case Estado::Obstrucao:
-      
-      break;
-
-    case Estado::Concluido:
-      // Estado terminal da operacao atual. Um novo ciclo pode ser definido depois.
-      break;
+      desenharEstado(estado,
+                     vazaoSetadaMlPorHora,
+                     tempoSetadoMinutos,
+                     estadoMotor,
+                     erroConfiguracao,
+                     segundosRestantes);
+      ultimaAtualizacaoTelaMs = agoraMs;
+      telaSuja = false;
     }
+
+    vTaskDelay(pdMS_TO_TICKS(20));
   }
+}
 
 } // namespace
 
-void setup()
-{
+void setup() {
   Serial.begin(115200);
-  Serial.print("Estado: ");
-  Serial.println(nomeDoEstado(estadoAtual));
 
   botao.iniciar();
-
   tela.iniciar();
-
-  fim_superior.iniciar();
-  fim_inferior.iniciar();
-
-  motor.iniciar();
-
   buzzer.iniciar();
+  fimSuperior.iniciar();
+  fimInferior.iniciar();
+  encoderEixo.iniciar();
+
+  if (!motor.iniciar()) {
+    motor.parar();
+    buzzer.tocar();
+    tela.Falha("Falha ao iniciar saida STEP");
+    return;
+  }
+
+  filaComandosMotor = xQueueCreate(4, sizeof(ComandoMotor));
+  filaEstadoMotor = xQueueCreate(1, sizeof(EstadoControleMotor));
+  if (filaComandosMotor == nullptr || filaEstadoMotor == nullptr) {
+    motor.parar();
+    buzzer.tocar();
+    tela.Falha("Falha ao criar filas RTOS");
+    return;
+  }
+
+  EstadoControleMotor estadoInicial;
+  xQueueOverwrite(filaEstadoMotor, &estadoInicial);
+
+  // Interface no nucleo 0; controle periodico do motor no nucleo 1.
+  const BaseType_t nucleoInterface = 0;
+  const BaseType_t nucleoControle = 1;
+  const bool controleCriado = controleMotor.iniciarTarefa(
+      filaComandosMotor, filaEstadoMotor, nucleoControle);
+  if (!controleCriado) {
+    motor.parar();
+    buzzer.tocar();
+    tela.Falha("Falha ao criar tarefas");
+    return;
+  }
+
+  const BaseType_t interfaceCriada = xTaskCreatePinnedToCore(
+      tarefaInterface, "interface", 6144, nullptr, 1, nullptr, nucleoInterface);
+  if (interfaceCriada != pdPASS) {
+    motor.parar();
+    buzzer.tocar();
+    tela.Falha("Falha ao criar tarefas");
+  }
 }
 
-void loop()
-{
-  const Eventos eventos = lerEventos();
-  atualizarMaquinaDeEstados(eventos);
-  delay(10);
+void loop() {
+  // A interface e o controle rodam em tarefas FreeRTOS dedicadas.
+  vTaskDelay(pdMS_TO_TICKS(1000));
 }
-
-
-// #include <Arduino.h>
-
-// void setup()
-// {
-//   Serial.begin(115200);
-// }
-
-// void loop()
-// {
-// }

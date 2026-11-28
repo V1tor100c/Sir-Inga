@@ -18,7 +18,10 @@ class Tela {
   void Confirmacao(float vazaoMlPorHora, uint8_t tempoMinutos);
   void ConfiguracaoValida(float vazaoMlPorHora, uint8_t tempoMinutos);
   void ConfiguracaoInvalida(const char* mensagem);
-  void Execucao(float vazaoMlPorHora, uint8_t tempoRestanteMinutos);
+  void Execucao(float vazaoAlvoMlPorHora,
+                float vazaoEstimadaMlPorHora,
+                float rpmMedido,
+                uint8_t tempoRestanteMinutos);
   // void Invalido(const char* mensagem);
   void Falha(const char* mensagem);
   void Obstrucao();

@@ -38,34 +38,49 @@ constexpr uint8_t PIN_FALHA_DRIVER_N = 33;
 constexpr uint8_t NIVEL_MOTOR_HABILITADO = LOW;
 constexpr uint8_t NIVEL_MOTOR_DESABILITADO = HIGH;
 constexpr uint8_t NIVEL_FALHA_DRIVER = LOW;
+constexpr uint8_t MODO_FALHA_DRIVER = INPUT_PULLUP;
 
 constexpr uint8_t CANAL_MOTOR = 0;
-constexpr uint8_t RESOLUCAO_MOTOR = 8;
-constexpr uint8_t LIGA_MOTOR = 127;
-constexpr uint8_t DESLIGA_MOTOR = 0;
-constexpr uint8_t FREQUENCIA_MOTOR_VOLTANDO = 1;
+constexpr uint8_t RESOLUCAO_MOTOR = 12;
+constexpr uint16_t DUTY_MOTOR_PASSO = 1 << (RESOLUCAO_MOTOR - 1); // 50%
+constexpr uint32_t FREQUENCIA_PASSO_MIN_HZ = 20;
+constexpr uint32_t FREQUENCIA_PASSO_MAX_HZ = 10000;
+constexpr uint32_t RAMPA_PASSO_HZ_POR_SEGUNDO = 1000;
 
 // Encoder incremental AS5040 no eixo: canais A/B e indice.
 constexpr uint8_t PIN_ENCODER_EIXO_A = 14;
 constexpr uint8_t PIN_ENCODER_EIXO_B = 15;
 constexpr uint8_t PIN_ENCODER_EIXO_INDEX = 13;
+// Placeholder: confirmar quantas transicoes A/B a classe conta por volta.
+constexpr uint32_t TRANSICOES_ENCODER_POR_VOLTA = 4096;
+
+// Controle e tarefas FreeRTOS. Valores iniciais para prototipo de bancada.
+constexpr uint32_t PERIODO_TAREFA_CONTROLE_MS = 10;
+constexpr uint32_t PERIODO_MEDICAO_VELOCIDADE_MS = 100;
+constexpr uint32_t TEMPO_MAXIMO_PARTIDA_MS = 3000;
+constexpr uint32_t TEMPO_MAXIMO_SEM_MOVIMENTO_MS = 1000;
+constexpr float GANHO_PI_KP = 40.0f; // Hz por RPM de erro; precisa ser ajustado
+constexpr float GANHO_PI_KI = 20.0f; // Hz por (RPM*s) de erro; precisa ser ajustado
 
 // Sinalizacao.
 constexpr uint8_t PIN_BUZZER = 32;
 constexpr uint8_t PIN_LED_STATUS_1 = 4;
 constexpr uint8_t PIN_LED_STATUS_2 = 2;
 
-// Seringa e parametros usados pelo calculo da velocidade (mantidos do projeto).
-constexpr int volumeSeginga = 5;
-constexpr float limiteInferiorVazao = 2.0f;
-constexpr float limiteSuperiorVazao = 750.0f;
-constexpr uint8_t limiteInferiorTempo = 0;
-constexpr uint8_t limiteSuperiorTempo = 61;
-constexpr float volume_seringa_ml = 5.0f;
-constexpr float area_seringa_mm = 1.0f;
+// PLACEHOLDERS MECANICOS: valores ficticios para estruturar o firmware.
+// Substituir e calibrar quando seringa, fuso, microstepping e encoder forem definidos.
+constexpr float volume_seringa_ml = 10.0f;
+constexpr float area_seringa_mm2 = 80.0f;
 constexpr float fuso_avanco_mm_por_volta = 1.0f;
 constexpr uint16_t passos_por_volta_motor = 200;
-// Ajustar para o microstep selecionado fisicamente nos jumpers H2 do DRV8825.
 constexpr uint16_t microsteps = 16;
+
+// Interface: vazao em mL/h e duracao em minutos.
+constexpr float limiteInferiorVazao = 2.0f;
+constexpr float limiteSuperiorVazao = 750.0f;
+constexpr uint8_t limiteInferiorTempoMin = 1;
+constexpr uint8_t limiteSuperiorTempoMin = 60;
+
+// Ganhos e geometria acima sao placeholders de software, nao valores calibrados.
 
 } // namespace Config
